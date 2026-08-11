@@ -7,6 +7,7 @@ import MintInvoice from "./pages/MintInvoice.jsx";
 import RiskUnderwriter from "./pages/RiskUnderwriter.jsx";
 import LiquidityVaults from "./pages/LiquidityVaults.jsx";
 import AuditLog from "./pages/AuditLog.jsx";
+import Landing from "./pages/Landing.jsx";
 
 /** Page registry — keys are the canonical route ids shared with the Sidebar. */
 const PAGES = {
@@ -20,6 +21,7 @@ const PAGES = {
 export default function App() {
   const [activePage, setActivePage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   const handleNavigate = useCallback((key) => {
     setActivePage(key);
@@ -32,7 +34,10 @@ export default function App() {
   useEffect(() => {
     const onNavigate = (e) => {
       const key = e.detail?.page;
-      if (PAGES[key]) handleNavigate(key);
+      if (PAGES[key]) {
+        setEntered(true); // deep links skip the landing page
+        handleNavigate(key);
+      }
     };
     window.addEventListener("syntura:navigate", onNavigate);
     return () => window.removeEventListener("syntura:navigate", onNavigate);
@@ -42,6 +47,8 @@ export default function App() {
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
 
   const { title, Component } = PAGES[activePage] ?? PAGES.dashboard;
+
+  if (!entered) return <Landing onLaunch={() => setEntered(true)} />;
 
   return (
     <div className="min-h-screen">
