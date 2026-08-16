@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Hexagon } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Hexagon } from "lucide-react";
 import { BOTCHAIN, CONTRACTS } from "../lib/chain.js";
 import { cn } from "../lib/utils.js";
 
@@ -427,7 +427,10 @@ const GROUPS = [...new Set(SECTIONS.map((s) => s.group))];
 
 export default function Docs() {
   const [active, setActive] = useState(SECTIONS[0].key);
-  const section = SECTIONS.find((s) => s.key === active) ?? SECTIONS[0];
+  const index = Math.max(0, SECTIONS.findIndex((s) => s.key === active));
+  const section = SECTIONS[index];
+  const prev = index > 0 ? SECTIONS[index - 1] : null;
+  const next = index < SECTIONS.length - 1 ? SECTIONS[index + 1] : null;
 
   const select = (key) => {
     setActive(key);
@@ -537,6 +540,51 @@ export default function Docs() {
             {section.title}
           </h1>
           {section.body}
+
+          {/* Prev / next pagination */}
+          <nav
+            aria-label="Documentation pagination"
+            className="mt-14 grid gap-4 border-t border-white/[0.06] pt-8 sm:grid-cols-2"
+          >
+            {prev ? (
+              <button
+                type="button"
+                onClick={() => select(prev.key)}
+                className="group flex items-center gap-3 rounded-xl border border-white/[0.08] bg-panel/40 px-5 py-4 text-left transition-colors hover:border-electric/40"
+              >
+                <ChevronLeft
+                  size={16}
+                  className="shrink-0 text-slate-600 transition-colors group-hover:text-electric"
+                />
+                <span className="min-w-0">
+                  <span className="eyebrow block">Previous</span>
+                  <span className="mt-1 block truncate text-sm font-semibold text-slate-200 transition-colors group-hover:text-white">
+                    {prev.title}
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <span className="hidden sm:block" />
+            )}
+            {next && (
+              <button
+                type="button"
+                onClick={() => select(next.key)}
+                className="group flex items-center justify-end gap-3 rounded-xl border border-white/[0.08] bg-panel/40 px-5 py-4 text-right transition-colors hover:border-electric/40 sm:col-start-2"
+              >
+                <span className="min-w-0">
+                  <span className="eyebrow block">Next</span>
+                  <span className="mt-1 block truncate text-sm font-semibold text-slate-200 transition-colors group-hover:text-white">
+                    {next.title}
+                  </span>
+                </span>
+                <ChevronRight
+                  size={16}
+                  className="shrink-0 text-slate-600 transition-colors group-hover:text-electric"
+                />
+              </button>
+            )}
+          </nav>
         </motion.main>
       </div>
     </div>
