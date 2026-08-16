@@ -20,7 +20,7 @@ import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 
-/* One real model run at module load — the hero terminal renders its actual
+/* One real model run at module load - the hero terminal renders its actual
    output, so the landing page is powered by the same engine as the dApp. */
 const SAMPLE_PAYLOAD = {
   debtorName: "Dangote Industries",
@@ -98,7 +98,7 @@ function SentryTerminal({ onLaunch }) {
           <span className="font-mono text-[10px] text-slate-600">just now</span>
         </div>
         <p className="mt-2 text-sm font-semibold text-slate-200">
-          {SAMPLE_PAYLOAD.debtorName} — {formatUSD(SAMPLE_PAYLOAD.faceValueUSD)}{" "}
+          {SAMPLE_PAYLOAD.debtorName} - {formatUSD(SAMPLE_PAYLOAD.faceValueUSD)}{" "}
           · {SAMPLE_PAYLOAD.termDays}-day term
         </p>
         <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-600">
@@ -121,7 +121,7 @@ function SentryTerminal({ onLaunch }) {
       <div className="mt-5">
         <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-slate-500">
           <span>Risk score</span>
-          <span>0 — 100</span>
+          <span>0 - 100</span>
         </div>
         <div className="relative mt-2 h-1.5 rounded-full bg-white/[0.06]">
           <div
@@ -179,7 +179,7 @@ const STAGES = [
     title: "Tokenize",
     icon: FilePlus2,
     tone: "text-electric",
-    copy: "Each invoice is minted as an ERC-721 SYNV NFT on BOTChain — a verifiable on-chain claim on future cash flow.",
+    copy: "Each invoice is minted as an ERC-721 SYNV NFT on BOTChain - a verifiable onchain claim on future cash flow.",
   },
   {
     n: "02",
@@ -187,7 +187,7 @@ const STAGES = [
     title: "AI Underwrite",
     icon: BrainCircuit,
     tone: "text-violetx-soft",
-    copy: "The AI Sentry prices risk and discount rate deterministically, committing an audit hash of its reasoning on-chain.",
+    copy: "The AI Sentry prices risk and discount rate deterministically, committing an audit hash of its reasoning onchain.",
   },
   {
     n: "03",
@@ -195,7 +195,7 @@ const STAGES = [
     title: "Stream",
     icon: Waves,
     tone: "text-emeraldx-soft",
-    copy: "The liquidity vault streams the advance to the supplier in real time — no 60-day wait for working capital.",
+    copy: "The liquidity vault streams the advance to the supplier in real time - no 60-day wait for working capital.",
   },
   {
     n: "04",
@@ -203,7 +203,7 @@ const STAGES = [
     title: "Settle",
     icon: CheckCircle2,
     tone: "text-amber-400",
-    copy: "On payment, an atomic 90/7/3 split pays supplier, pool and treasury — LPs earn real-world yield.",
+    copy: "On payment, an atomic 90/7/3 split pays supplier, pool and treasury - LPs earn real-world yield.",
   },
 ];
 
@@ -211,7 +211,7 @@ const CONTRACTS_GRID = [
   {
     name: "SynturaInvoiceNFT",
     chip: "ERC-721 · SYNV",
-    copy: "The tokenized invoice registry: face value, debtor, due date, risk score and settlement state — every field a public, on-chain claim.",
+    copy: "The tokenized invoice registry: face value, debtor, due date, risk score and settlement state - every field a public, onchain claim.",
   },
   {
     name: "SynturaVault",
@@ -221,19 +221,19 @@ const CONTRACTS_GRID = [
   {
     name: "SynturaSentryRegistry",
     chip: "AUDIT ANCHORS",
-    copy: "On-chain identity for AI agents. Only verified sentries underwrite, and every risk score is committed with a reproducible audit hash.",
+    copy: "Onchain identity for AI agents. Only verified sentries underwrite, and every risk score is committed with a reproducible audit hash.",
   },
   {
     name: SENTRY_MODEL_ID,
     chip: "0 DEPS · DETERMINISTIC",
-    copy: "The underwriting engine itself — seven weighted factors plus fraud heuristics, identical output for identical input, in browser or Node.",
+    copy: "The underwriting engine itself - seven weighted factors plus fraud heuristics, identical output for identical input, in browser or Node.",
   },
 ];
 
 const TRUST = [
   {
     title: "Deterministic",
-    copy: "No black box. Identical invoice payloads always produce identical scores and an identical audit hash — anyone can re-run the open-source model and verify what was committed on-chain.",
+    copy: "No black box. Identical invoice payloads always produce identical scores and an identical audit hash - anyone can re-run the open-source model and verify what was committed onchain.",
   },
   {
     title: "Chain-pinned",
@@ -241,7 +241,7 @@ const TRUST = [
   },
   {
     title: "Honest by default",
-    copy: "Nothing is mocked. Every invoice, vault balance and audit entry is read from the contracts, and every action is a wallet-signed transaction — the app shows an explicitly empty state rather than fake data before deployment.",
+    copy: "Nothing is mocked. Every invoice, vault balance and audit entry is read from the contracts, and every action is a wallet-signed transaction - the app shows an explicitly empty state rather than fake data before deployment.",
   },
 ];
 
@@ -302,7 +302,7 @@ export default function Landing({ onLaunch }) {
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-emeraldx" />
-            BOTChain Builder Challenge · Season 2 — AI × RWA
+            BOTChain Builder Challenge · Season 2 - AI × RWA
           </motion.div>
 
           <motion.h1
@@ -324,7 +324,7 @@ export default function Landing({ onLaunch }) {
             Syntura is an AI-underwritten invoice protocol. It tokenizes B2B
             receivables as RWA NFTs, prices their risk with a deterministic
             underwriting agent, and streams working capital to suppliers the
-            moment the audit clears — settling every invoice with an atomic
+            moment the audit clears - settling every invoice with an atomic
             90/7/3 split. Auditable, always.
           </motion.p>
 
@@ -402,7 +402,7 @@ export default function Landing({ onLaunch }) {
             </h2>
           </motion.div>
           <motion.p {...reveal} className="max-w-sm text-[13px] leading-relaxed text-slate-500">
-            Every lifecycle event — mint, underwrite, stream, settle — emits an
+            Every lifecycle event - mint, underwrite, stream, settle - emits an
             indexed event the in-app audit log renders as an explorer-linked
             timeline.
           </motion.p>
@@ -455,8 +455,8 @@ export default function Landing({ onLaunch }) {
             <span className="text-gradient">closes fast.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm text-slate-400">
-            Connect a BOTChain wallet and run the whole lifecycle — mint,
-            underwrite, stream, settle — on mainnet.
+            Connect a BOTChain wallet and run the whole lifecycle - mint,
+            underwrite, stream, settle - on mainnet.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary mt-8">
             Launch app <ArrowRight size={14} />
@@ -476,7 +476,7 @@ export default function Landing({ onLaunch }) {
             </div>
             <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-slate-500">
               AI-underwritten RWA invoices on BOTChain. Tokenize, price, stream,
-              settle — with every decision auditable.
+              settle - with every decision auditable.
             </p>
           </div>
           {[

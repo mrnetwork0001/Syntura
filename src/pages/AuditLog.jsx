@@ -16,7 +16,7 @@ import { GlassCard, SectionTitle, TxLink, EmptyState } from "../components/ui/Gl
 import { cn, formatDate, formatTime } from "../lib/utils.js";
 import { BOTCHAIN } from "../lib/chain.js";
 
-/** Visual identity per on-chain event type — icon + color family. */
+/** Visual identity per onchain event type - icon + color family. */
 const EVENT_TYPES = {
   MINT: {
     label: "Mint",
@@ -163,7 +163,7 @@ function TimelineEvent({ evt, index, isLast }) {
 }
 
 /**
- * On-Chain Execution Explorer — filterable, color-coded timeline of every
+ * Onchain Execution Explorer - filterable, color-coded timeline of every
  * protocol event (mints, AI underwrites, streams, settlements, vault flows),
  * each deep-linked to the BOTChain explorer.
  */
@@ -196,8 +196,8 @@ export default function AuditLog() {
       className="mx-auto max-w-4xl space-y-6"
     >
       <SectionTitle
-        title="On-Chain Execution Explorer"
-        subtitle="Every protocol action — mint, AI underwrite, stream, settlement and vault flow — recorded as a verifiable BOTChain transaction."
+        title="Onchain Execution Explorer"
+        subtitle="Every protocol action - mint, AI underwrite, stream, settlement and vault flow - recorded as a verifiable BOTChain transaction."
         action={
           <span className="flex items-center gap-2 rounded-full border border-emeraldx/40 bg-emeraldx/10 px-3 py-1.5 text-xs font-semibold text-emeraldx-soft">
             <span className="relative flex h-2 w-2">

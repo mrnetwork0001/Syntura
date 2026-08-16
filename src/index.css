@@ -33,7 +33,7 @@
 }
 
 @layer components {
-  /* Flat terminal panel — hairline border, no blur. Name kept for compat. */
+  /* Flat terminal panel - hairline border, no blur. Name kept for compat. */
   .glass {
     @apply bg-panel/60 border border-white/[0.07] rounded-xl shadow-glass;
   }

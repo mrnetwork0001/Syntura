@@ -8,7 +8,7 @@ export function cn(...inputs) {
 
 /** Format a number as USD, e.g. 125000 -> "$125,000". */
 export function formatUSD(value, { compact = false, decimals } = {}) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -19,7 +19,7 @@ export function formatUSD(value, { compact = false, decimals } = {}) {
 
 /** Format a ratio (0.0842) or percent value (8.42) as "8.42%". */
 export function formatPercent(value, decimals = 2) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
   return `${Number(value).toFixed(decimals)}%`;
 }
 
@@ -30,19 +30,19 @@ export function bpsToPercent(bps, decimals = 2) {
 
 /** Shorten an EVM address: 0x1234…abcd. */
 export function shortAddress(addr, chars = 4) {
-  if (!addr) return "—";
+  if (!addr) return "-";
   return `${addr.slice(0, chars + 2)}…${addr.slice(-chars)}`;
 }
 
 /** Shorten a tx hash for display. */
 export function shortHash(hash, chars = 6) {
-  if (!hash) return "—";
+  if (!hash) return "-";
   return `${hash.slice(0, chars + 2)}…${hash.slice(-chars)}`;
 }
 
 /** ISO date string -> "Sep 14, 2026". Pass { utc: true } to format in UTC. */
 export function formatDate(iso, { utc = false } = {}) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

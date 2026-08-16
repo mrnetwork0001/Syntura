@@ -38,13 +38,13 @@ const YIELD_STEPS = [
   {
     icon: Waves,
     title: "Vault streams advances",
-    body: "AI-underwritten invoices draw real-time payouts — the pool advances face value to suppliers block by block.",
+    body: "AI-underwritten invoices draw real-time payouts - the pool advances face value to suppliers block by block.",
     tile: "border-violetx/30 bg-violetx/10 text-violetx-soft",
   },
   {
     icon: Coins,
     title: "Settlement yield flows back",
-    body: "When the debtor pays, 7% of every settlement routes pro-rata to providers — withdraw any time.",
+    body: "When the debtor pays, 7% of every settlement routes pro-rata to providers - withdraw any time.",
     tile: "border-emeraldx/30 bg-emeraldx/10 text-emeraldx-soft",
   },
 ];
@@ -317,7 +317,7 @@ export default function LiquidityVaults() {
               >
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-emeraldx-soft">
                   <CheckCircle2 size={16} />
-                  Deposit confirmed — now earning streaming yield
+                  Deposit confirmed - now earning streaming yield
                 </span>
                 <TxLink hash={depositTx} />
               </motion.div>
@@ -369,7 +369,7 @@ export default function LiquidityVaults() {
                   Pool share
                 </span>
                 <span className="font-mono text-sm font-bold text-electric-soft">
-                  {yourSharePct > 0 ? formatPercent(yourSharePct, 3) : "—"}
+                  {yourSharePct > 0 ? formatPercent(yourSharePct, 3) : "-"}
                 </span>
               </div>
             </div>
@@ -482,7 +482,7 @@ export default function LiquidityVaults() {
                   90 / 7 / 3 Settlement Split
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Every settled invoice is split atomically on-chain.
+                  Every settled invoice is split atomically onchain.
                 </p>
               </div>
             </div>
@@ -529,7 +529,7 @@ export default function LiquidityVaults() {
         <GlassCard>
           <SectionTitle
             title="How Streaming Yield Works"
-            subtitle="From deposit to real-time settlement yield in three on-chain steps."
+            subtitle="From deposit to real-time settlement yield in three onchain steps."
             className="mb-6"
           />
           <div className="flex flex-col items-stretch gap-4 md:flex-row md:items-center">

@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import { cn, shortHash } from "../../lib/utils.js";
 import { explorerTxUrl } from "../../lib/chain.js";
 
-/** Frosted panel — the base building block of every screen. */
+/** Frosted panel - the base building block of every screen. */
 export function GlassCard({ className, children, hover = false, ...props }) {
   return (
     <div className={cn("glass p-6", hover && "glass-hover", className)} {...props}>
@@ -100,7 +100,7 @@ export function SectionTitle({ title, subtitle, action, className }) {
 
 /** Monospace tx-hash chip that deep-links to the BOTChain explorer. */
 export function TxLink({ hash, className }) {
-  if (!hash) return <span className="text-slate-500">—</span>;
+  if (!hash) return <span className="text-slate-500">-</span>;
   return (
     <a
       href={explorerTxUrl(hash)}

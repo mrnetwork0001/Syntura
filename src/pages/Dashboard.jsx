@@ -189,7 +189,7 @@ export default function Dashboard() {
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-electric/30 bg-electric/10 px-3 py-1 text-xs font-semibold text-electric-soft">
               <Sparkles size={13} />
-              BOTChain Builder Challenge · Season 2 — AI × RWA
+              BOTChain Builder Challenge · Season 2 - AI × RWA
             </span>
             <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
               Autonomous AI RWA{" "}
@@ -198,11 +198,11 @@ export default function Dashboard() {
             <p className="mt-3 text-sm leading-relaxed text-slate-400 sm:text-base">
               Tokenize real-world invoices as NFTs, let the AI Risk Sentry
               underwrite them in seconds, and stream liquidity to suppliers in
-              real time — every settlement split{" "}
+              real time - every settlement split{" "}
               <span className="font-semibold text-slate-200">
                 {supplierPct}/{poolPct}/{treasuryPct}
               </span>{" "}
-              atomically on-chain.
+              atomically onchain.
             </p>
           </div>
           <div className="glass-inset shrink-0 p-5 lg:w-72">
@@ -261,7 +261,7 @@ export default function Dashboard() {
       <GlassCard>
         <SectionTitle
           title="Settlement Fee Split"
-          subtitle="Every settled invoice executes an atomic on-chain distribution — enforced by SynturaVault in basis points."
+          subtitle="Every settled invoice executes an atomic onchain distribution - enforced by SynturaVault in basis points."
           action={
             <span className="font-mono text-xs text-slate-500">
               {supplierPct * 100} / {poolPct * 100} / {treasuryPct * 100} BPS
@@ -276,7 +276,7 @@ export default function Dashboard() {
               animate={{ width: `${seg.pct}%` }}
               transition={{ duration: 0.9, delay: 0.15 + i * 0.15, ease: "easeOut" }}
               className={cn("h-full", seg.bar)}
-              title={`${seg.title} — ${seg.pct}%`}
+              title={`${seg.title} - ${seg.pct}%`}
             />
           ))}
         </div>
@@ -315,7 +315,7 @@ export default function Dashboard() {
             action={
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/70 bg-panel/40 px-3 py-1 text-xs font-semibold text-slate-300">
                 <ReceiptText size={13} className="text-electric-soft" />
-                {invoices.length} on-chain
+                {invoices.length} onchain
               </span>
             }
           />

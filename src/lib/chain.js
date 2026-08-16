@@ -137,9 +137,9 @@ export function isLiveChainConfigured() {
 }
 
 /**
- * On-chain value scale: invoices are denominated in USD, settlement legs move
+ * Onchain value scale: invoices are denominated in USD, settlement legs move
  * native BOT at 1 USD = 1e12 wei (documented protocol constant). A $125,000
- * invoice therefore settles with 0.125 BOT of real value — every flow is a
+ * invoice therefore settles with 0.125 BOT of real value - every flow is a
  * genuine mainnet transaction without requiring six-figure balances.
  */
 export const WEI_PER_USD = 10n ** 12n;

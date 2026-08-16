@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   { key: "mint", label: "Mint RWA Invoice", icon: FilePlus2 },
   { key: "underwriter", label: "AI Risk Underwriter", icon: BrainCircuit },
   { key: "vaults", label: "Liquidity Vaults", icon: Vault },
-  { key: "audit", label: "On-Chain Audit Log", icon: ScrollText },
+  { key: "audit", label: "Onchain Audit Log", icon: ScrollText },
 ];
 
 function Brand({ onClick, collapsed }) {
@@ -54,7 +54,7 @@ function Brand({ onClick, collapsed }) {
   );
 }
 
-/** Chevron toggle for the desktop rail — points right when collapsed. */
+/** Chevron toggle for the desktop rail - points right when collapsed. */
 function CollapseToggle({ collapsed, onToggle }) {
   return (
     <button
@@ -100,7 +100,7 @@ function NavList({ active, onNavigate, variant, collapsed = false }) {
           >
             {isActive && (
               <motion.span
-                // Distinct layoutId per variant — desktop + mobile mount together.
+                // Distinct layoutId per variant - desktop + mobile mount together.
                 layoutId={`nav-active-${variant}`}
                 transition={{ type: "spring", stiffness: 380, damping: 34 }}
                 className="absolute inset-0 rounded-md border border-electric/40 bg-electric/[0.06]"
@@ -131,10 +131,10 @@ function WalletDot({ onExpand }) {
       onClick={connected ? onExpand : connect}
       title={
         connected
-          ? `${shortAddress(wallet.address)} · ${wallet.balanceBOT === null ? "…" : wallet.balanceBOT.toFixed(4)} BOT — expand for details`
+          ? `${shortAddress(wallet.address)} · ${wallet.balanceBOT === null ? "…" : wallet.balanceBOT.toFixed(4)} BOT - expand for details`
           : "Connect Wallet"
       }
-      aria-label={connected ? "Wallet connected — expand menu" : "Connect Wallet"}
+      aria-label={connected ? "Wallet connected - expand menu" : "Connect Wallet"}
       className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-panel/40 transition-colors hover:border-electric/40"
     >
       {wallet.connecting ? (
@@ -204,7 +204,7 @@ function WalletCard() {
         Balance
       </p>
       <p className="mt-0.5 font-mono text-xl font-bold text-emeraldx-soft">
-        {wallet.balanceBOT === null ? "—" : wallet.balanceBOT.toFixed(4)}{" "}
+        {wallet.balanceBOT === null ? "-" : wallet.balanceBOT.toFixed(4)}{" "}
         <span className="text-xs font-semibold text-slate-500">BOT</span>
       </p>
       <a

@@ -24,12 +24,12 @@ const SynturaContext = createContext(null);
  * Global protocol state, backed entirely by BOTChain Mainnet.
  *
  * Every read comes from the deployed contracts (invoice structs, vault
- * accounting, event logs) and every action is a wallet-signed transaction —
+ * accounting, event logs) and every action is a wallet-signed transaction -
  * there are no simulated writes and no seeded data. Until contract addresses
  * are configured in .env the store exposes an explicitly empty state
  * (`configured: false`) so the UI can say so instead of pretending.
  *
- * Store API (stable — consumed by every page):
+ * Store API (stable - consumed by every page):
  *   invoices, vault, auditLog, sentries, wallet, liveMode, configured,
  *   loading, chainError, clearChainError(),
  *   connect(), refresh(), tokenizeInvoice(payload, underwriting),
@@ -168,7 +168,7 @@ export function SynturaProvider({ children }) {
             return {
               id,
               supplier: inv.supplier,
-              supplierName: meta.supplierName || "On-chain supplier",
+              supplierName: meta.supplierName || "Onchain supplier",
               debtorName: inv.debtorName,
               faceValueUSD: weiToUsd(inv.faceValueUSD),
               dueDate: new Date(dueMs).toISOString().slice(0, 10),
@@ -208,8 +208,8 @@ export function SynturaProvider({ children }) {
         for (const e of underwritten)
           push(
             e, "AI_UNDERWRITE",
-            `AI Sentry underwrote Invoice #${e.args.invoiceId} — risk ${e.args.riskScore}/100 @ ${(Number(e.args.discountRateBps) / 100).toFixed(2)}%`,
-            `Audit hash ${e.args.auditHash.slice(0, 10)}… committed on-chain`
+            `AI Sentry underwrote Invoice #${e.args.invoiceId} - risk ${e.args.riskScore}/100 @ ${(Number(e.args.discountRateBps) / 100).toFixed(2)}%`,
+            `Audit hash ${e.args.auditHash.slice(0, 10)}… committed onchain`
           );
         for (const e of streamed)
           push(
@@ -220,25 +220,25 @@ export function SynturaProvider({ children }) {
         for (const e of settled)
           push(
             e, "SETTLEMENT",
-            `Invoice #${e.args.invoiceId} settled — 90/7/3 fee split executed`,
+            `Invoice #${e.args.invoiceId} settled - 90/7/3 fee split executed`,
             `Supplier $${weiToUsd(e.args.supplierPayout).toLocaleString()} · Pool $${weiToUsd(e.args.poolFee).toLocaleString()} · Treasury $${weiToUsd(e.args.treasuryFee).toLocaleString()}`
           );
         for (const e of deposited)
           push(
             e, "DEPOSIT",
-            `Liquidity deposit — $${weiToUsd(e.args.amount).toLocaleString()} into streaming vault`,
+            `Liquidity deposit - $${weiToUsd(e.args.amount).toLocaleString()} into streaming vault`,
             `Provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         for (const e of withdrawn)
           push(
             e, "WITHDRAW",
-            `Principal withdrawn — $${weiToUsd(e.args.amount).toLocaleString()} returned`,
+            `Principal withdrawn - $${weiToUsd(e.args.amount).toLocaleString()} returned`,
             `Provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         for (const e of yieldPulled)
           push(
             e, "WITHDRAW",
-            `Yield withdrawn — $${weiToUsd(e.args.amount).toLocaleString()} paid out`,
+            `Yield withdrawn - $${weiToUsd(e.args.amount).toLocaleString()} paid out`,
             `Pro-rata settlement fees · provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         entries.sort((a, b) => b.blockNumber - a.blockNumber || (a.ts < b.ts ? 1 : -1));
@@ -314,7 +314,7 @@ export function SynturaProvider({ children }) {
       const res = await connectWallet();
       if (!res) {
         setWallet({ address: null, connecting: false, balanceBOT: null });
-        setChainError("No wallet detected — install MetaMask (or any injected wallet) to transact.");
+        setChainError("No wallet detected - install MetaMask (or any injected wallet) to transact.");
         return null;
       }
       await switchToBOTChain();
@@ -336,7 +336,7 @@ export function SynturaProvider({ children }) {
     }
   }, [liveMode, refresh]);
 
-  /** Clears the local session — injected wallets have no true "disconnect". */
+  /** Clears the local session - injected wallets have no true "disconnect". */
   const disconnect = useCallback(() => {
     signerRef.current = null;
     setWallet({ address: null, connecting: false, balanceBOT: null });
@@ -346,7 +346,7 @@ export function SynturaProvider({ children }) {
   const requireSigner = useCallback(async () => {
     if (!liveMode) {
       throw new Error(
-        "Contracts are not deployed yet — run `npm run deploy:botchain` and set the VITE_*_ADDRESS values in .env."
+        "Contracts are not deployed yet - run `npm run deploy:botchain` and set the VITE_*_ADDRESS values in .env."
       );
     }
     if (!signerRef.current) {
@@ -357,7 +357,7 @@ export function SynturaProvider({ children }) {
   }, [liveMode, connect]);
 
   /**
-   * Mint an invoice NFT, then underwrite it on-chain with the AI Sentry's
+   * Mint an invoice NFT, then underwrite it onchain with the AI Sentry's
    * verdict and anchor the audit hash in the registry. Throws on failure
    * (MintInvoice surfaces the message).
    */
@@ -412,7 +412,7 @@ export function SynturaProvider({ children }) {
         // Mint succeeded; underwriting is gated to registered sentries/owner.
         await refresh();
         throw new Error(
-          `Invoice #${id} minted (tx ${receipt.hash.slice(0, 10)}…) but on-chain underwriting failed: ${friendlyChainError(err, "sentry not authorized")}. Underwrite from the registered sentry wallet.`
+          `Invoice #${id} minted (tx ${receipt.hash.slice(0, 10)}…) but onchain underwriting failed: ${friendlyChainError(err, "sentry not authorized")}. Underwrite from the registered sentry wallet.`
         );
       }
 
@@ -455,7 +455,7 @@ export function SynturaProvider({ children }) {
     [requireSigner, refresh]
   );
 
-  /** Settles an invoice — the caller pays face value as the debtor. */
+  /** Settles an invoice - the caller pays face value as the debtor. */
   const settleInvoice = useCallback(
     async (id) => {
       try {
