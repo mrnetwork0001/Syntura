@@ -8,6 +8,7 @@ import RiskUnderwriter from "./pages/RiskUnderwriter.jsx";
 import LiquidityVaults from "./pages/LiquidityVaults.jsx";
 import AuditLog from "./pages/AuditLog.jsx";
 import Landing from "./pages/Landing.jsx";
+import { useSyntura } from "./context/SynturaStore.jsx";
 
 /** Page registry — keys are the canonical route ids shared with the Sidebar. */
 const PAGES = {
@@ -17,6 +18,28 @@ const PAGES = {
   vaults: { title: "Liquidity Vaults", Component: LiquidityVaults },
   audit: { title: "On-Chain Audit Log", Component: AuditLog },
 };
+
+/** Slim strip under the topbar surfacing wallet/RPC failures with a dismiss. */
+function ChainErrorBanner() {
+  const { chainError, clearChainError } = useSyntura();
+  if (!chainError) return null;
+  return (
+    <div className="border-b border-amber-500/30 bg-amber-500/[0.07]">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
+        <p className="min-w-0 truncate font-mono text-[11px] text-amber-300">
+          {chainError}
+        </p>
+        <button
+          type="button"
+          onClick={clearChainError}
+          className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400 transition-colors hover:text-white"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [activePage, setActivePage] = useState("dashboard");
@@ -70,6 +93,7 @@ export default function App() {
       {/* Content column — offset by the fixed w-64 sidebar on desktop. */}
       <div className="flex min-h-screen flex-col lg:ml-64">
         <Topbar title={title} onMenu={openSidebar} />
+        <ChainErrorBanner />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-6 sm:px-6 lg:px-8">
           <AnimatePresence mode="wait">
