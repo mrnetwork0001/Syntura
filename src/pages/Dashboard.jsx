@@ -231,7 +231,6 @@ export default function Dashboard() {
           icon={FileStack}
           label="Total Invoices Tokenized"
           value={invoices.length}
-          delta={12.4}
           accent="electric"
           index={0}
         />
@@ -239,7 +238,6 @@ export default function Dashboard() {
           icon={Waves}
           label="Total Streaming Liquidity"
           value={formatUSD(vault.activeStreamsUSD)}
-          delta={8.1}
           accent="violet"
           index={1}
         />
@@ -247,15 +245,13 @@ export default function Dashboard() {
           icon={ShieldCheck}
           label="AI Risk Audits Passed"
           value={stats.audited}
-          delta={5.6}
           accent="emerald"
           index={2}
         />
         <StatCard
           icon={TrendingUp}
-          label="Average Yield APY"
+          label="Pool Return · Lifetime"
           value={formatPercent(vault.averageYieldAPY)}
-          delta={1.9}
           accent="amber"
           index={3}
         />

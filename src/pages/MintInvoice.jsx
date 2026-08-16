@@ -34,7 +34,7 @@ import {
   formatDate,
   daysUntil,
 } from "../lib/utils.js";
-import { SECTORS } from "../lib/mockData.js";
+import { SECTORS } from "../lib/constants.js";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
 

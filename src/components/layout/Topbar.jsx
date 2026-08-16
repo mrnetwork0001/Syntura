@@ -1,38 +1,7 @@
 import React from "react";
-import { Globe, Loader2, Menu, Wallet } from "lucide-react";
+import { Loader2, Menu, Wallet } from "lucide-react";
 import { useSyntura } from "../../context/SynturaStore.jsx";
-import { BOTCHAIN } from "../../lib/chain.js";
-import { cn, shortAddress } from "../../lib/utils.js";
-
-function ModeChip({ liveMode }) {
-  return (
-    <span
-      className={cn(
-        "hidden items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider sm:inline-flex",
-        liveMode
-          ? "border-emeraldx/40 bg-emeraldx/10 text-emeraldx-soft"
-          : "border-amber-500/40 bg-amber-500/10 text-amber-300"
-      )}
-    >
-      <span
-        className={cn(
-          "h-1.5 w-1.5 animate-pulse rounded-full",
-          liveMode ? "bg-emeraldx" : "bg-amber-400"
-        )}
-      />
-      {liveMode ? "Live · BOTChain" : "Demo Simulation"}
-    </span>
-  );
-}
-
-function NetworkChip() {
-  return (
-    <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-300 md:inline-flex">
-      <Globe size={13} className="text-electric" />
-      {BOTCHAIN.name}
-    </span>
-  );
-}
+import { shortAddress } from "../../lib/utils.js";
 
 function WalletControl() {
   const { wallet, connect } = useSyntura();
@@ -79,10 +48,8 @@ function WalletControl() {
   );
 }
 
-/** Sticky app header: page title, mode/network chips, wallet connection. */
+/** Sticky app header: page title + wallet connection. */
 export default function Topbar({ title, onMenu }) {
-  const { liveMode } = useSyntura();
-
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800/60 bg-abyss/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
@@ -100,8 +67,6 @@ export default function Topbar({ title, onMenu }) {
         </h1>
 
         <div className="flex shrink-0 items-center gap-2.5">
-          <ModeChip liveMode={liveMode} />
-          <NetworkChip />
           <WalletControl />
         </div>
       </div>

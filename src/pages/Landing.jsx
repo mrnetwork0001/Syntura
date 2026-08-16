@@ -158,7 +158,7 @@ function SentryTerminal({ onLaunch }) {
               1-click mint ready
             </p>
             <p className="truncate font-mono text-[9px] text-slate-600">
-              BOTChain · chain {BOTCHAIN.chainId} · demo until deployed
+              BOTChain · chain {BOTCHAIN.chainId} · unsigned until you approve
             </p>
           </div>
         </div>
@@ -241,7 +241,7 @@ const TRUST = [
   },
   {
     title: "Honest by default",
-    copy: "Until contracts are deployed, the dApp labels itself Demo Simulation in the topbar — flows are fully clickable, and nothing masquerades as a live transaction.",
+    copy: "Nothing is mocked. Every invoice, vault balance and audit entry is read from the contracts, and every action is a wallet-signed transaction — the app shows an explicitly empty state rather than fake data before deployment.",
   },
 ];
 
@@ -254,7 +254,7 @@ export default function Landing({ onLaunch }) {
       label: "Total liquidity",
       value: formatUSD(vault.totalLiquidityUSD, { compact: true }),
     },
-    { label: "Average APY", value: formatPercent(vault.averageYieldAPY) },
+    { label: "Pool return", value: formatPercent(vault.averageYieldAPY) },
     { label: "Chain ID", value: String(BOTCHAIN.chainId) },
   ];
 
@@ -455,7 +455,8 @@ export default function Landing({ onLaunch }) {
             <span className="text-gradient">closes fast.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm text-slate-400">
-            No wallet needed — the demo book is fully clickable, end to end.
+            Connect a BOTChain wallet and run the whole lifecycle — mint,
+            underwrite, stream, settle — on mainnet.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary mt-8">
             Launch app <ArrowRight size={14} />
@@ -538,8 +539,8 @@ export default function Landing({ onLaunch }) {
         <div className="border-t border-white/[0.06]">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
             <p className="font-mono text-[10px] leading-relaxed text-slate-600">
-              Demo simulation — on-chain writes are simulated until contracts are
-              deployed. Built by Ifeanyichukwu Onwo (mrnetwork) · Apache-2.0.
+              Every payload is unsigned until your wallet approves it. Built by
+              Ifeanyichukwu Onwo (mrnetwork) · Apache-2.0.
             </p>
             <p className="font-mono text-[10px] uppercase tracking-wider text-slate-600">
               BOTChain · Chain {BOTCHAIN.chainId}

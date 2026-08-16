@@ -153,7 +153,7 @@ export default function LiquidityVaults() {
         action={
           <span className="inline-flex items-center gap-2 rounded-full border border-emeraldx/30 bg-emeraldx/10 px-3 py-1 text-xs font-semibold text-emeraldx-soft">
             <Sparkles size={13} />
-            {formatPercent(apy)} avg APY
+            {formatPercent(apy)} lifetime pool return
           </span>
         }
       />
@@ -175,7 +175,7 @@ export default function LiquidityVaults() {
         />
         <StatCard
           icon={TrendingUp}
-          label="Avg Yield APY"
+          label="Pool Return · Lifetime"
           value={formatPercent(apy)}
           accent="emerald"
           index={2}
@@ -251,7 +251,7 @@ export default function LiquidityVaults() {
             <div className="glass-inset mt-5 rounded-xl p-4">
               <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 <TrendingUp size={14} className="text-emeraldx-soft" />
-                Projected yield at {formatPercent(apy)} APY
+                Projected at {formatPercent(apy)} lifetime pool return
               </p>
               {projection ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

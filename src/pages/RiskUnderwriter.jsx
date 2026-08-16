@@ -26,12 +26,9 @@ import {
 import { GlassCard, Badge, ProgressBar, RiskGauge, TxLink } from "../components/ui/Glass.jsx";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import { underwriteInvoice, classifyRisk, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
-import { SECTORS } from "../lib/mockData.js";
+import { SECTORS } from "../lib/constants.js";
 import { cn, formatUSD, formatPercent, bpsToPercent, shortAddress, formatDate } from "../lib/utils.js";
 import { CONTRACTS, explorerAddressUrl } from "../lib/chain.js";
-
-/** Demo identity of the registered on-chain sentry (deploy script registers the deployer). */
-const SENTRY_AGENT_ADDRESS = "0x5E27aB9c41D3f80E6B2a9C7d4e1F0b8A3c6d5E42";
 
 const PRESETS = [
   {
@@ -181,7 +178,7 @@ function SentryStatusChip({ tone, icon: Icon, children }) {
 }
 
 export default function RiskUnderwriter() {
-  const { invoices, liveMode } = useSyntura();
+  const { invoices, liveMode, sentries } = useSyntura();
   const [form, setForm] = useState(PRESETS[0].values);
   const [activePreset, setActivePreset] = useState(PRESETS[0].name);
 
@@ -220,7 +217,8 @@ export default function RiskUnderwriter() {
   const tier = classifyRisk(result.riskScore);
   const advanceUSD = (form.faceValueUSD * result.advanceRatePct) / 100;
   const discountFeeUSD = (form.faceValueUSD * result.discountRateBps) / 10_000;
-  const commitments = invoices.filter((i) => i.riskScore > 0).length;
+  const primarySentry = sentries[0] ?? null;
+  const commitments = primarySentry?.commitments ?? 0;
   const fraudTone =
     result.fraudProbability < 5 ? "text-emeraldx-soft" : result.fraudProbability < 15 ? "text-amber-300" : "text-rose-400";
 
@@ -579,12 +577,12 @@ export default function RiskUnderwriter() {
                 {shortAddress(CONTRACTS.sentryRegistry)}
               </a>
             ) : (
-              <span className="text-amber-300/80">{liveMode ? "configured" : "demo simulation"}</span>
+              <span className="text-amber-300/80">{liveMode ? "configured" : "awaiting deployment"}</span>
             )}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {/* Verified primary sentry */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -596,24 +594,37 @@ export default function RiskUnderwriter() {
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emeraldx/30 bg-emeraldx/10 text-emeraldx-soft">
                   <Bot size={20} />
                 </div>
-                <SentryStatusChip tone="verified" icon={BadgeCheck}>
-                  Verified
+                <SentryStatusChip
+                  tone={primarySentry ? "verified" : "staging"}
+                  icon={primarySentry ? BadgeCheck : Activity}
+                >
+                  {primarySentry ? "Verified" : "Pending"}
                 </SentryStatusChip>
               </div>
-              <p className="mt-4 font-mono text-sm font-bold text-white">{SENTRY_MODEL_ID}</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Primary underwriting sentry · this sandbox</p>
+              <p className="mt-4 font-mono text-sm font-bold text-white">
+                {primarySentry?.modelId || SENTRY_MODEL_ID}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Primary underwriting sentry · same engine as this sandbox
+              </p>
               <div className="mt-4 space-y-2.5 text-xs">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-slate-400">Agent address</span>
-                  <a
-                    href={explorerAddressUrl(SENTRY_AGENT_ADDRESS)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-electric-soft transition-colors hover:text-white"
-                  >
-                    {shortAddress(SENTRY_AGENT_ADDRESS)}
-                    <ExternalLink size={11} />
-                  </a>
+                  {primarySentry ? (
+                    <a
+                      href={explorerAddressUrl(primarySentry.address)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-electric-soft transition-colors hover:text-white"
+                    >
+                      {shortAddress(primarySentry.address)}
+                      <ExternalLink size={11} />
+                    </a>
+                  ) : (
+                    <span className="font-mono text-slate-500">
+                      registered at deployment
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-slate-400">Risk commitments</span>
@@ -626,43 +637,6 @@ export default function RiskUnderwriter() {
               </div>
               <p className="mt-4 rounded-lg border border-slate-800/80 bg-abyss/60 px-3 py-2 font-mono text-[10px] leading-relaxed text-slate-500">
                 commitRiskScore(invoiceId, riskScore, auditHash)
-              </p>
-            </GlassCard>
-          </motion.div>
-
-          {/* Staging sentry */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.22, duration: 0.4 }}
-          >
-            <GlassCard hover className="h-full">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300">
-                  <Cpu size={20} />
-                </div>
-                <SentryStatusChip tone="staging" icon={Activity}>
-                  Staging
-                </SentryStatusChip>
-              </div>
-              <p className="mt-4 font-mono text-sm font-bold text-white">syntura-sentry-v2-rc1</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Next-gen model · shadow-scoring pipeline</p>
-              <div className="mt-4 space-y-2.5 text-xs">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Agent address</span>
-                  <span className="font-mono text-slate-500">pending registration</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Risk commitments</span>
-                  <span className="font-mono font-bold text-white">0</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Scoring</span>
-                  <span className="font-mono text-slate-300">shadow mode only</span>
-                </div>
-              </div>
-              <p className="mt-4 rounded-lg border border-slate-800/80 bg-abyss/60 px-3 py-2 font-mono text-[10px] leading-relaxed text-slate-500">
-                Promoted once shadow scores match v1 commitments across 500 invoices.
               </p>
             </GlassCard>
           </motion.div>
