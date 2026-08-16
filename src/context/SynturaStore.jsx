@@ -77,13 +77,17 @@ export function SynturaProvider({ children }) {
   const [vault, setVault] = useState(EMPTY_VAULT);
   const [auditLog, setAuditLog] = useState([]);
   const [sentries, setSentries] = useState([]);
-  const [wallet, setWallet] = useState({ address: null, connecting: false });
+  const [wallet, setWallet] = useState({
+    address: null,
+    connecting: false,
+    balanceBOT: null,
+  });
   const [loading, setLoading] = useState(liveMode);
   const [chainError, setChainError] = useState(null);
 
   const signerRef = useRef(null);
   const readProviderRef = useRef(null);
-  if (liveMode && !readProviderRef.current) {
+  if (!readProviderRef.current) {
     readProviderRef.current = getReadProvider();
   }
 
@@ -256,10 +260,17 @@ export function SynturaProvider({ children }) {
         let yourDepositWei = 0n;
         let yourYieldWei = 0n;
         if (address) {
-          [yourDepositWei, yourYieldWei] = await Promise.all([
+          let balanceWei = 0n;
+          [yourDepositWei, yourYieldWei, balanceWei] = await Promise.all([
             vaultC.depositOf(address),
             vaultC.yieldOf(address),
+            provider.getBalance(address),
           ]);
+          setWallet((w) =>
+            w.address === address
+              ? { ...w, balanceBOT: Number(balanceWei) / 1e18 }
+              : w
+          );
         }
         const totalDepUSD = weiToUsd(totalDepWei);
         setVault({
@@ -302,21 +313,34 @@ export function SynturaProvider({ children }) {
     try {
       const res = await connectWallet();
       if (!res) {
-        setWallet({ address: null, connecting: false });
+        setWallet({ address: null, connecting: false, balanceBOT: null });
         setChainError("No wallet detected — install MetaMask (or any injected wallet) to transact.");
         return null;
       }
       await switchToBOTChain();
       signerRef.current = res.signer;
-      setWallet({ address: res.address, connecting: false });
+      const balanceWei = await readProviderRef.current
+        .getBalance(res.address)
+        .catch(() => 0n);
+      setWallet({
+        address: res.address,
+        connecting: false,
+        balanceBOT: Number(balanceWei) / 1e18,
+      });
       if (liveMode) refresh(res.address);
       return res.address;
     } catch (err) {
-      setWallet({ address: null, connecting: false });
+      setWallet({ address: null, connecting: false, balanceBOT: null });
       setChainError(friendlyChainError(err, "Wallet connection failed."));
       return null;
     }
   }, [liveMode, refresh]);
+
+  /** Clears the local session — injected wallets have no true "disconnect". */
+  const disconnect = useCallback(() => {
+    signerRef.current = null;
+    setWallet({ address: null, connecting: false, balanceBOT: null });
+  }, []);
 
   /** Signer-bound contracts; connects the wallet first if needed. */
   const requireSigner = useCallback(async () => {
@@ -495,6 +519,7 @@ export function SynturaProvider({ children }) {
       chainError,
       clearChainError,
       connect,
+      disconnect,
       refresh,
       tokenizeInvoice,
       startStream,
@@ -513,6 +538,7 @@ export function SynturaProvider({ children }) {
       chainError,
       clearChainError,
       connect,
+      disconnect,
       refresh,
       tokenizeInvoice,
       startStream,
