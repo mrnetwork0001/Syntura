@@ -1,5 +1,6 @@
 // Hardhat config for the Syntura protocol (CJS — the package itself is ESM).
 require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-verify");
 require("dotenv").config();
 
 const { BOTCHAIN_RPC_URL, BOTCHAIN_CHAIN_ID, PRIVATE_KEY } = process.env;
@@ -28,4 +29,19 @@ module.exports = {
       accounts,
     },
   },
+  // Source verification against the BOT Chain Blockscout explorer.
+  etherscan: {
+    apiKey: { botchain: "blockscout" }, // Blockscout accepts any non-empty key
+    customChains: [
+      {
+        network: "botchain",
+        chainId: 677,
+        urls: {
+          apiURL: "https://scan.botchain.ai/api",
+          browserURL: "https://scan.botchain.ai",
+        },
+      },
+    ],
+  },
+  sourcify: { enabled: false },
 };

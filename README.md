@@ -327,7 +327,9 @@ Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395*
 
 ## BOTChain Network Configuration
 
-### Deployed contracts — live on BOT Chain Mainnet
+### Deployed contracts — live on BOT Chain Mainnet, source-verified
+
+All three contracts are **source-verified on the explorer** — each address below shows readable Solidity, the ABI, and a Read/Write console.
 
 | Contract | Address |
 |----------|---------|
