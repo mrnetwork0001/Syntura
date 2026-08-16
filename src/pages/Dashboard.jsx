@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Sparkles,
   FileStack,
   Waves,
   ShieldCheck,
@@ -187,11 +186,7 @@ export default function Dashboard() {
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-violetx/15 blur-3xl" />
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-electric/30 bg-electric/10 px-3 py-1 text-xs font-semibold text-electric-soft">
-              <Sparkles size={13} />
-              BOTChain Builder Challenge · Season 2 - AI × RWA
-            </span>
-            <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
+            <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
               Autonomous AI RWA{" "}
               <span className="text-gradient">Invoice Protocol</span>
             </h1>
