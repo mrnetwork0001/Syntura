@@ -4,20 +4,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        abyss: "#0b0f19",
-        panel: "#1e293b",
+        abyss: "#05060c",
+        panel: "#0f1220",
         electric: {
-          DEFAULT: "#3b82f6",
-          soft: "#60a5fa",
-          deep: "#1d4ed8",
+          DEFAULT: "#22d3ee",
+          soft: "#67e8f9",
+          deep: "#0891b2",
         },
         emeraldx: {
           DEFAULT: "#10b981",
           soft: "#34d399",
         },
         violetx: {
-          DEFAULT: "#8b5cf6",
-          soft: "#a78bfa",
+          DEFAULT: "#7c5cff",
+          soft: "#9d85ff",
         },
       },
       fontFamily: {
@@ -38,14 +38,14 @@ export default {
         ],
       },
       boxShadow: {
-        glass: "0 8px 32px rgba(2, 6, 23, 0.55)",
-        "glow-blue": "0 0 24px rgba(59, 130, 246, 0.35)",
-        "glow-emerald": "0 0 24px rgba(16, 185, 129, 0.35)",
-        "glow-violet": "0 0 24px rgba(139, 92, 246, 0.35)",
+        glass: "0 1px 0 rgba(255,255,255,0.03) inset",
+        "glow-blue": "0 0 20px rgba(34, 211, 238, 0.18)",
+        "glow-emerald": "0 0 20px rgba(52, 211, 153, 0.18)",
+        "glow-violet": "0 0 20px rgba(124, 92, 255, 0.18)",
       },
       backgroundImage: {
         "grid-faint":
-          "linear-gradient(rgba(148,163,184,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.05) 1px, transparent 1px)",
+          "linear-gradient(rgba(148,163,184,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.045) 1px, transparent 1px)",
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
