@@ -20,10 +20,16 @@ const NAV_ITEMS = [
   { key: "audit", label: "On-Chain Audit Log", icon: ScrollText },
 ];
 
-function Brand() {
+function Brand({ onClick }) {
   return (
-    <div className="flex items-center gap-3 px-2">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+    <button
+      type="button"
+      onClick={onClick}
+      title="Back to landing page"
+      aria-label="Back to landing page"
+      className="group flex items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors hover:bg-white/[0.03]"
+    >
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition-colors group-hover:border-electric/40">
         <Hexagon size={20} className="text-electric" strokeWidth={2.25} />
       </div>
       <div className="min-w-0">
@@ -34,7 +40,7 @@ function Brand() {
           AI × RWA Protocol
         </p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -107,7 +113,7 @@ function NetworkFooter() {
  * App navigation rail. Fixed w-64 on desktop; slide-over with backdrop on
  * mobile (controlled via `open` / `onClose`).
  */
-export default function Sidebar({ active, onNavigate, open, onClose }) {
+export default function Sidebar({ active, onNavigate, open, onClose, onBrand }) {
   // Escape closes the mobile slide-over.
   useEffect(() => {
     if (!open) return undefined;
@@ -130,7 +136,7 @@ export default function Sidebar({ active, onNavigate, open, onClose }) {
     <>
       {/* Desktop rail */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-800/60 bg-abyss/70 px-4 py-6 backdrop-blur-xl lg:flex">
-        <Brand />
+        <Brand onClick={onBrand} />
         <NavList active={active} onNavigate={onNavigate} variant="desktop" />
         <NetworkFooter />
       </aside>
@@ -161,7 +167,7 @@ export default function Sidebar({ active, onNavigate, open, onClose }) {
               aria-label="Navigation"
             >
               <div className="flex items-center justify-between">
-                <Brand />
+                <Brand onClick={onBrand} />
                 <button
                   type="button"
                   onClick={onClose}

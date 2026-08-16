@@ -46,6 +46,13 @@ export default function App() {
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
 
+  // Sidebar logo → back to the landing page.
+  const exitToLanding = useCallback(() => {
+    setEntered(false);
+    setSidebarOpen(false);
+    window.scrollTo(0, 0);
+  }, []);
+
   const { title, Component } = PAGES[activePage] ?? PAGES.dashboard;
 
   if (!entered) return <Landing onLaunch={() => setEntered(true)} />;
@@ -57,6 +64,7 @@ export default function App() {
         onNavigate={handleNavigate}
         open={sidebarOpen}
         onClose={closeSidebar}
+        onBrand={exitToLanding}
       />
 
       {/* Content column — offset by the fixed w-64 sidebar on desktop. */}
