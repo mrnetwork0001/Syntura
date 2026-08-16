@@ -1,16 +1,16 @@
 <div align="center">
 
-# ⬡ Syntura
+# Syntura
 
 ### Autonomous AI RWA Invoice & Real-Time Yield Streaming Protocol
 
 **Tokenize real-world invoices as NFTs · Underwrite them with a deterministic, auditable AI risk agent · Stream working capital to suppliers in real time · Settle with an automated 90 / 7 / 3 split — all on BOTChain Mainnet.**
 
-[![BOTChain Mainnet](https://img.shields.io/badge/Chain-BOTChain%20Mainnet-2563eb?style=for-the-badge&logo=ethereum&logoColor=white)](#-botchain-network-configuration)
-[![Solidity 0.8.24](https://img.shields.io/badge/Solidity-0.8.24-363636?style=for-the-badge&logo=solidity&logoColor=white)](#-smart-contracts)
-[![React 18 + Vite 5](https://img.shields.io/badge/React%2018-Vite%205-61dafb?style=for-the-badge&logo=react&logoColor=black)](#-frontend-feature-tour)
+[![BOTChain Mainnet](https://img.shields.io/badge/Chain-BOTChain%20Mainnet-2563eb?style=for-the-badge&logo=ethereum&logoColor=white)](#botchain-network-configuration)
+[![Solidity 0.8.24](https://img.shields.io/badge/Solidity-0.8.24-363636?style=for-the-badge&logo=solidity&logoColor=white)](#smart-contracts)
+[![React 18 + Vite 5](https://img.shields.io/badge/React%2018-Vite%205-61dafb?style=for-the-badge&logo=react&logoColor=black)](#frontend-feature-tour)
 [![License Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-10b981?style=for-the-badge)](./LICENSE)
-[![AI x RWA](https://img.shields.io/badge/Builder%20Challenge%20%232-AI%20%C3%97%20RWA%20·%20Season%202-8b5cf6?style=for-the-badge)](#-why-syntura-wins-season-2)
+[![AI x RWA](https://img.shields.io/badge/Builder%20Challenge%20%232-AI%20%C3%97%20RWA%20·%20Season%202-8b5cf6?style=for-the-badge)](#why-syntura-wins-season-2)
 
 *Built by **Ifeanyichukwu Onwo** (`mrnetwork`) for the BOTChain Builder Challenge #2 — Season 2: AI × RWA.*
 
@@ -18,25 +18,25 @@
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
-1. [Executive Summary](#-executive-summary)
-2. [Why Syntura Wins Season 2](#-why-syntura-wins-season-2)
-3. [Architecture](#-architecture)
-4. [Repository Structure](#-repository-structure)
-5. [Smart Contracts](#-smart-contracts)
-6. [The AI Risk Sentry](#-the-ai-risk-sentry)
-7. [Frontend Feature Tour](#-frontend-feature-tour)
-8. [Quickstart](#-quickstart)
-9. [Settlement Fee Split](#-settlement-fee-split)
-10. [Security Model](#-security-model)
-11. [BOTChain Network Configuration](#-botchain-network-configuration)
-12. [Roadmap](#-roadmap)
-13. [License](#-license)
+1. [Executive Summary](#executive-summary)
+2. [Why Syntura Wins Season 2](#why-syntura-wins-season-2)
+3. [Architecture](#architecture)
+4. [Repository Structure](#repository-structure)
+5. [Smart Contracts](#smart-contracts)
+6. [The AI Risk Sentry](#the-ai-risk-sentry)
+7. [Frontend Feature Tour](#frontend-feature-tour)
+8. [Quickstart](#quickstart)
+9. [Settlement Fee Split](#settlement-fee-split)
+10. [Security Model](#security-model)
+11. [BOTChain Network Configuration](#botchain-network-configuration)
+12. [Roadmap](#roadmap)
+13. [License](#license)
 
 ---
 
-## 🧭 Executive Summary
+## Executive Summary
 
 **$3+ trillion of the world's SME invoices sit unpaid at any moment.** Suppliers who have already delivered goods wait 30–90 days for payment, while banks decline the majority of small-business factoring requests — slowest and most opaque in exactly the emerging markets that need working capital most.
 
@@ -53,7 +53,7 @@ The result: suppliers get same-day liquidity, liquidity providers earn yield fro
 
 ---
 
-## 🏆 Why Syntura Wins Season 2
+## Why Syntura Wins Season 2
 
 Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent" — the AI agent and the real-world asset are structurally fused at the contract level.
 
@@ -77,7 +77,7 @@ Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -121,7 +121,7 @@ flowchart TB
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 Syntura/
@@ -165,7 +165,7 @@ Syntura/
 
 ---
 
-## 📜 Smart Contracts
+## Smart Contracts
 
 All contracts are **Solidity `^0.8.24`**, built on **OpenZeppelin v5**, fully NatSpec-documented, SPDX `Apache-2.0`. The frontend consumes them through human-readable ethers v6 ABIs in [`src/lib/chain.js`](./src/lib/chain.js) — a hard interface contract between the dApp and the chain.
 
@@ -212,7 +212,7 @@ The accountability layer: which model said what, about which asset, provably.
 
 ---
 
-## 🤖 The AI Risk Sentry
+## The AI Risk Sentry
 
 `src/agent/aiSentryAgent.js` is the protocol's underwriter: a **pure-ESM, zero-dependency, explainable multi-factor scoring model** that runs in the browser (instant sandbox re-scoring) and in Node (`npm run sentry:demo`) with identical output.
 
@@ -251,7 +251,7 @@ The **discount rate** is then derived from composite risk plus the time value of
 
 ---
 
-## 🖥 Frontend Feature Tour
+## Frontend Feature Tour
 
 Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, lucide icons. Fully responsive, animated page transitions, every transaction deep-linked to the BOTChain explorer.
 
@@ -269,7 +269,7 @@ Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, l
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
 **Prerequisites:** Node 18+, npm.
 
@@ -298,21 +298,21 @@ Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGIS
 
 ---
 
-## 💰 Settlement Fee Split
+## Settlement Fee Split
 
 Every settled invoice executes one atomic split, enforced by BPS constants in `SynturaVault.sol`:
 
 | Recipient | Share | BPS | Rationale |
 |-----------|-------|-----|-----------|
-| 🏭 **Supplier** | **90%** | `9000` | The business that did the work keeps the overwhelming majority |
-| 💧 **Liquidity Pool** | **7%** | `700` | Real-world yield for LPs — claimable pro-rata via `withdrawYield()` |
-| 🏛 **Protocol Treasury** | **3%** | `300` | Sustains the protocol; address set at deploy (`TREASURY_ADDRESS`) |
+|  **Supplier** | **90%** | `9000` | The business that did the work keeps the overwhelming majority |
+|  **Liquidity Pool** | **7%** | `700` | Real-world yield for LPs — claimable pro-rata via `withdrawYield()` |
+|  **Protocol Treasury** | **3%** | `300` | Sustains the protocol; address set at deploy (`TREASURY_ADDRESS`) |
 
 Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395** · treasury **$1,455**, exactly as emitted in `SettlementExecuted` and rendered in the in-app audit log.
 
 ---
 
-## 🔐 Security Model
+## Security Model
 
 - **ReentrancyGuard** on every value-moving function in `SynturaVault` (`depositLiquidity`, `streamPayout`, `withdrawYield`, settlement).
 - **Pull-over-push payments** — LP yield accrues in-contract and is withdrawn by the provider (`withdrawYield`), never force-sent, eliminating gas-griefing and reentrancy vectors on distribution.
@@ -321,13 +321,13 @@ Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395*
 - **Auditability by default** — every state transition emits an indexed event, and every AI decision carries an on-chain hash commitment that anyone can recompute from the open-source model.
 - **No secrets in code** — keys, RPC endpoints, and the treasury address live exclusively in `.env` (see `.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time.
 
-> ⚠️ Hackathon-stage software: the contracts follow established OpenZeppelin patterns but have **not** undergone an external audit. Do not deploy with meaningful value before one.
+>  Hackathon-stage software: the contracts follow established OpenZeppelin patterns but have **not** undergone an external audit. Do not deploy with meaningful value before one.
 
 ---
 
-## 🌐 BOTChain Network Configuration
+## BOTChain Network Configuration
 
-### ✅ Deployed contracts — live on BOT Chain Mainnet
+### Deployed contracts — live on BOT Chain Mainnet
 
 | Contract | Address |
 |----------|---------|
@@ -358,7 +358,7 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 
 ---
 
-## 🗺 Roadmap
+## Roadmap
 
 - **Stablecoin settlement rails** — denominate streams and settlements in on-chain stablecoins alongside native BOT.
 - **Continuous per-block streaming** — upgrade `streamPayout` from advance-tranche streaming to true per-second vesting curves.
@@ -371,7 +371,7 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 
 ---
 
-## 📄 License
+## License
 
 **Apache License 2.0** — see [LICENSE](./LICENSE).
 
@@ -379,6 +379,6 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 
 *Syntura — turning the world's unpaid invoices into transparent, AI-underwritten, yield-streaming assets on BOTChain.*
 
-**⬡ Built for BOTChain Builder Challenge #2 · Season 2: AI × RWA · by Ifeanyichukwu Onwo (mrnetwork)**
+** Built for BOTChain Builder Challenge #2 · Season 2: AI × RWA · by Ifeanyichukwu Onwo (mrnetwork)**
 
 </div>
