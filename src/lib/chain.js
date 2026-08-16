@@ -27,6 +27,7 @@ export const INVOICE_NFT_ABI = [
   "function settleInvoice(uint256 invoiceId)",
   "function getInvoice(uint256 invoiceId) view returns (tuple(uint256 invoiceId, address supplier, string debtorName, uint256 faceValueUSD, uint256 dueDate, uint16 riskScore, uint16 discountRateBps, bool isUnderwritten, bool isSettled))",
   "function totalInvoices() view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
   "event InvoiceMinted(uint256 indexed invoiceId, address indexed supplier, uint256 faceValueUSD, uint256 dueDate)",
   "event InvoiceUnderwritten(uint256 indexed invoiceId, uint16 riskScore, uint16 discountRateBps, bytes32 auditHash)",
   "event InvoiceSettled(uint256 indexed invoiceId, uint256 supplierPayout, uint256 poolFee, uint256 treasuryFee)",
@@ -34,13 +35,23 @@ export const INVOICE_NFT_ABI = [
 
 export const VAULT_ABI = [
   "function depositLiquidity() payable",
+  "function withdrawLiquidity(uint256 amount)",
   "function streamPayout(uint256 invoiceId)",
+  "function settleInvoice(uint256 invoiceId) payable",
   "function withdrawYield()",
   "function totalLiquidity() view returns (uint256)",
+  "function availableLiquidity() view returns (uint256)",
+  "function providerCount() view returns (uint256)",
+  "function depositOf(address provider) view returns (uint256)",
+  "function streamedOf(uint256 invoiceId) view returns (uint256)",
+  "function totalOutstandingAdvances() view returns (uint256)",
+  "function totalPoolFeesAccrued() view returns (uint256)",
   "function yieldOf(address provider) view returns (uint256)",
   "event LiquidityDeposited(address indexed provider, uint256 amount)",
+  "event LiquidityWithdrawn(address indexed provider, uint256 amount)",
   "event PayoutStreamed(uint256 indexed invoiceId, address indexed supplier, uint256 amount)",
   "event YieldWithdrawn(address indexed provider, uint256 amount)",
+  "event SettlementExecuted(uint256 indexed invoiceId, uint256 supplierPayout, uint256 poolFee, uint256 treasuryFee)",
 ];
 
 export const SENTRY_REGISTRY_ABI = [
@@ -120,7 +131,29 @@ export function explorerAddressUrl(addr) {
   return `${BOTCHAIN.explorerUrl}/address/${addr}`;
 }
 
-/** True when contract addresses are configured (live mode) vs demo simulation. */
+/** True when contract addresses are configured (live mode). */
 export function isLiveChainConfigured() {
   return Boolean(CONTRACTS.invoiceNFT && CONTRACTS.vault);
 }
+
+/**
+ * On-chain value scale: invoices are denominated in USD, settlement legs move
+ * native BOT at 1 USD = 1e12 wei (documented protocol constant). A $125,000
+ * invoice therefore settles with 0.125 BOT of real value — every flow is a
+ * genuine mainnet transaction without requiring six-figure balances.
+ */
+export const WEI_PER_USD = 10n ** 12n;
+
+/** USD number -> bigint wei at the protocol scale. */
+export function usdToWei(usd) {
+  // Round to cents first so float noise can't corrupt the bigint conversion.
+  return (BigInt(Math.round(Number(usd) * 100)) * WEI_PER_USD) / 100n;
+}
+
+/** bigint wei -> USD number at the protocol scale. */
+export function weiToUsd(wei) {
+  return Number((wei * 100n) / WEI_PER_USD) / 100;
+}
+
+/** First block to scan for protocol events (set after deployment to speed reads). */
+export const DEPLOY_BLOCK = Number(import.meta.env.VITE_DEPLOY_BLOCK || 0);
