@@ -45,6 +45,16 @@ export default function App() {
   const [activePage, setActivePage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [entered, setEntered] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("syntura:sidebar-collapsed") === "1"
+  );
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((c) => {
+      localStorage.setItem("syntura:sidebar-collapsed", c ? "0" : "1");
+      return !c;
+    });
+  }, []);
 
   const handleNavigate = useCallback((key) => {
     setActivePage(key);
@@ -88,10 +98,16 @@ export default function App() {
         open={sidebarOpen}
         onClose={closeSidebar}
         onBrand={exitToLanding}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapsed}
       />
 
-      {/* Content column — offset by the fixed w-64 sidebar on desktop. */}
-      <div className="flex min-h-screen flex-col lg:ml-64">
+      {/* Content column — offset by the fixed sidebar rail on desktop. */}
+      <div
+        className={`flex min-h-screen flex-col transition-[margin] duration-300 ${
+          collapsed ? "lg:ml-[76px]" : "lg:ml-64"
+        }`}
+      >
         <Topbar title={title} onMenu={openSidebar} />
         <ChainErrorBanner />
 
