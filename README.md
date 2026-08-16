@@ -49,7 +49,7 @@
 | **3 · Stream** | The liquidity vault streams the advance (typically ~85% of face value) to the supplier in real time — no 60-day wait | `SynturaVault.sol` |
 | **4 · Settle** | When the debtor pays, settlement executes an atomic **90% supplier / 7% liquidity pool / 3% treasury** split, and LPs withdraw yield pro-rata | `SynturaVault.sol` |
 
-The result: suppliers get same-day liquidity, liquidity providers earn real-world yield (~11%+ APY in the demo book), and every AI decision that moved money is **verifiable on the BOTChain explorer** — not a black box.
+The result: suppliers get same-day liquidity, liquidity providers earn yield from real settlement cash flows, and every AI decision that moved money is **verifiable on the BOTChain explorer** — not a black box.
 
 ---
 
@@ -72,7 +72,7 @@ Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent
 ### Execution quality
 
 - Three production-grade Solidity 0.8.24 contracts (OpenZeppelin v5, ReentrancyGuard, pull-payments, NatSpec throughout).
-- A polished five-screen React 18 + Vite dApp with a premium dark-glassmorphism design system, framer-motion transitions, and a full demo-simulation mode — the entire protocol is clickable end-to-end **today**, with or without a wallet, while `src/lib/chain.js` ships the complete ethers v6 wiring (typed contract handles, wallet connect, network switching) for on-chain execution.
+- A polished five-screen React 18 + Vite dApp, fully chain-backed: every invoice, vault balance and audit entry is read from the deployed contracts, and every action is a wallet-signed BOTChain transaction routed through the ethers v6 layer in `src/lib/chain.js`.
 - One-command deploy pipeline to BOTChain (`npm run deploy:botchain`) that wires all three contracts together and prints ready-to-paste `VITE_*` env lines.
 
 ---
@@ -142,7 +142,7 @@ Syntura/
 │   │   └── ui/
 │   │       └── Glass.jsx            # Design kit: GlassCard, StatCard, Badge, RiskGauge…
 │   ├── context/
-│   │   └── SynturaStore.jsx         # Global protocol state + demo/live action layer
+│   │   └── SynturaStore.jsx         # Chain-backed protocol state + signed actions
 │   ├── lib/
 │   │   ├── chain.js                 # BOTChain config, ABIs, providers, wallet, explorer links
 │   │   ├── mockData.js              # Seed invoice book, vault metrics, audit trail
@@ -258,12 +258,14 @@ Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, l
 | # | Screen | What it shows |
 |---|--------|---------------|
 | 1 | **Dashboard** | Hero + live protocol stats (invoices tokenized, streaming liquidity, AI audits passed, average APY), the 90/7/3 fee-split visual, and the full invoice book with per-row lifecycle actions — **Start Stream** on underwritten invoices, **Settle** on streaming ones, with live progress bars and tx links |
-| 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → mint with success tx link (simulated in demo mode) |
-| 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them — watch the risk gauge, discount rate, and factor weights respond in real time. Below, a representative Sentry Network panel (demo data) modeled on the `SynturaSentryRegistry` record shape — model ID, address, commitment count, verified status |
+| 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → mint + on-chain underwrite + registry commitment, with the real tx link |
+| 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them — watch the risk gauge, discount rate, and factor weights respond in real time. Below, the Sentry Network panel reads the live `SynturaSentryRegistry` — registered model ID, agent address, and on-chain commitment count |
 | 4 | **Liquidity Vaults** | Vault stats, one-click deposit with quick-pick chips ($1k/$10k/$50k) and projected-yield math, your position + pull-payment yield withdrawal, pool utilization, and a 3-step "how streaming yield works" explainer |
 | 5 | **On-Chain Audit Log** | An execution explorer: a filterable, color-coded timeline of every protocol event (MINT / AI_UNDERWRITE / STREAM / SETTLEMENT / DEPOSIT / WITHDRAW), newest first, each entry linking to the BOTChain explorer |
 
-**Dual-mode design:** with no contract addresses configured, the dApp runs a full **demo simulation** — seeded with a realistic emerging-markets invoice book and simulated tx latency — so every flow is clickable in seconds. Once deployed addresses land in `.env`, `isLiveChainConfigured()` flips the topbar chip to **Live · BOTChain** and the ethers v6 contract layer (`src/lib/chain.js`) exposes typed handles for every deployed contract; routing the store's write actions through those handles is the final wiring step on the roadmap — in this build, writes remain simulated in both modes.
+**Nothing is mocked:** the store reads invoices from `getInvoice`, vault accounting from the vault's view functions, and the audit timeline from indexed contract events; mint/underwrite/stream/settle/deposit/withdraw are wallet-signed transactions. Before contract addresses land in `.env`, the app shows an explicitly empty **Awaiting deployment** state instead of fake data.
+
+**Value scale:** invoices are USD-denominated; settlement legs move native BOT at a documented protocol scale of **1 USD = 10¹² wei**, so a $125,000 invoice settles with 0.125 BOT of real value — every flow is a genuine mainnet transaction at sane cost.
 
 ---
 
@@ -278,7 +280,7 @@ npm install
 # 2 · Configure environment
 cp .env.example .env        # then fill in the values (see footnote below)
 
-# 3 · Run the dApp (demo mode works with zero chain config)
+# 3 · Run the dApp (shows an empty Awaiting-deployment state until step 4)
 npm run dev                 # → http://localhost:5173
 
 # 4 · Compile the contracts
@@ -286,13 +288,13 @@ npm run compile
 
 # 5 · Deploy the full protocol to BOTChain
 npm run deploy:botchain     # deploys Registry → InvoiceNFT → Vault, wires them,
-                            # registers the demo sentry, prints VITE_* lines for .env
+                            # registers the deployer as sentry, prints VITE_* lines for .env
 
 # 6 · Run the AI Sentry standalone (Node, no browser)
 npm run sentry:demo
 ```
 
-Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Demo Simulation** to **Live · BOTChain**.
+Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Awaiting deployment** to **Live · BOTChain** — from that point every button is a mainnet transaction. Mint and underwrite from the deployer wallet (it is the registered sentry).
 
 ---
 
@@ -306,7 +308,7 @@ Every settled invoice executes one atomic split, enforced by BPS constants in `S
 | 💧 **Liquidity Pool** | **7%** | `700` | Real-world yield for LPs — claimable pro-rata via `withdrawYield()` |
 | 🏛 **Protocol Treasury** | **3%** | `300` | Sustains the protocol; address set at deploy (`TREASURY_ADDRESS`) |
 
-Example — the demo book's Invoice #2 ($48,500, Safaricom PLC): supplier **$43,650** · pool **$3,395** · treasury **$1,455**, exactly as rendered in the in-app audit log.
+Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395** · treasury **$1,455**, exactly as emitted in `SettlementExecuted` and rendered in the in-app audit log.
 
 ---
 
@@ -325,6 +327,17 @@ Example — the demo book's Invoice #2 ($48,500, Safaricom PLC): supplier **$43,
 
 ## 🌐 BOTChain Network Configuration
 
+### ✅ Deployed contracts — live on BOT Chain Mainnet
+
+| Contract | Address |
+|----------|---------|
+| `SynturaInvoiceNFT` (SYNV) | [`0xD8816ecf2D243f4B5328502ACAB83a9dF043A40a`](https://scan.botchain.ai/address/0xD8816ecf2D243f4B5328502ACAB83a9dF043A40a) |
+| `SynturaVault` | [`0x7199D8db46142B784ab4De225EADf91f4F10ca14`](https://scan.botchain.ai/address/0x7199D8db46142B784ab4De225EADf91f4F10ca14) |
+| `SynturaSentryRegistry` | [`0x19B0c0BB8A654b950739B84776A5951BA4ABf676`](https://scan.botchain.ai/address/0x19B0c0BB8A654b950739B84776A5951BA4ABf676) |
+| Registered AI sentry (`syntura-sentry-v1`) | [`0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635`](https://scan.botchain.ai/address/0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635) |
+
+The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified — `underwriteInvoice` is gated through `isVerifiedSentry`.
+
 All chain parameters are **environment-driven**, with the verified BOT Chain Mainnet values as fallback defaults:
 
 | Parameter | Value |
@@ -339,9 +352,9 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 |----------|---------|---------|
 | `BOTCHAIN_RPC_URL` / `BOTCHAIN_CHAIN_ID` | Hardhat (`hardhat.config.cjs`) | Deploy target |
 | `VITE_BOTCHAIN_RPC_URL` / `VITE_BOTCHAIN_CHAIN_ID` / `VITE_BOTCHAIN_EXPLORER_URL` | Frontend (`src/lib/chain.js`) | Providers, wallet add/switch-chain, explorer deep-links |
-| `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` | Frontend | Flips demo → live mode when set |
+| `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` | Frontend | Enables live mode when set |
 
-> **Note on network values:** chain ID 677 and the RPC/explorer endpoints above match the public BOT Chain Mainnet registry ([chainlist.org/chain/677](https://chainlist.org/chain/677)) and were verified live via `eth_chainId` against `https://rpc.botchain.ai`. If the BOTChain team publishes different official endpoints for the challenge, point `.env` at those — no code changes required. Until contract addresses are configured, the dApp transparently labels itself **"Demo Simulation"** in the topbar rather than pretending to be live.
+> **Note on network values:** chain ID 677 and the RPC/explorer endpoints above match the public BOT Chain Mainnet registry ([chainlist.org/chain/677](https://chainlist.org/chain/677)) and were verified live via `eth_chainId` against `https://rpc.botchain.ai`. If the BOTChain team publishes different official endpoints for the challenge, point `.env` at those — no code changes required. Until contract addresses are configured, the dApp transparently labels itself **"Awaiting deployment"** in the topbar and shows an empty state rather than fake data.
 
 ---
 
