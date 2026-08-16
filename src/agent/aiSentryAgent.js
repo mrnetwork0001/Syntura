@@ -1,11 +1,11 @@
 /**
- * Syntura AI Risk Sentry — deterministic, explainable invoice underwriting.
+ * Syntura AI Risk Sentry - deterministic, explainable invoice underwriting.
  *
  * Pure ESM, zero dependencies, runs unchanged in the browser and in Node.
  * Identical payloads always produce identical results: all "noise" is derived
- * from FNV-1a / xorshift hashes of the payload itself — never Math.random.
+ * from FNV-1a / xorshift hashes of the payload itself - never Math.random.
  * The auditHash is a 256-bit commitment over the normalized payload + scores,
- * suitable for on-chain anchoring via SynturaSentryRegistry.commitRiskScore().
+ * suitable for onchain anchoring via SynturaSentryRegistry.commitRiskScore().
  */
 
 export const SENTRY_MODEL_ID = "syntura-sentry-v1";
@@ -90,7 +90,7 @@ const SIZE_CURVE = [
   [2, 40], [3, 62], [4, 80], [4.6, 86], [5, 84], [5.6, 68], [6, 55], [7, 35],
 ];
 
-// Factor weights — must sum to 1.0 so the composite stays on a 0-100 scale.
+// Factor weights - must sum to 1.0 so the composite stays on a 0-100 scale.
 const WEIGHTS = {
   debtorCredit: 0.24,
   paymentHistory: 0.20,
@@ -250,7 +250,7 @@ export function underwriteInvoice(payload) {
       ` · ${p.debtorYearsTrading}y trading`,
   });
   rationale.push(
-    `debtor "${p.debtorName}" credit ${creditScore}/100 — form signals +${posSignal}, adverse -${negSignal}, ${p.debtorYearsTrading}y trading`
+    `debtor "${p.debtorName}" credit ${creditScore}/100 - form signals +${posSignal}, adverse -${negSignal}, ${p.debtorYearsTrading}y trading`
   );
 
   /* 2 ── Repayment history: Laplace-smoothed ratio, volume-weighted */
@@ -261,7 +261,7 @@ export function underwriteInvoice(payload) {
   let historyNote;
   if (historyTotal === 0) {
     historyScore = 55;
-    historyNote = "no on-protocol repayment history — neutral prior applied";
+    historyNote = "no on-protocol repayment history - neutral prior applied";
   } else {
     const laplace = ((paid + 1) / (historyTotal + 2)) * 100;
     const confidence = historyTotal / (historyTotal + 4);
@@ -279,9 +279,9 @@ export function underwriteInvoice(payload) {
     impact: historyScore >= 72 ? "positive" : historyScore <= 48 ? "negative" : "neutral",
     note: historyNote,
   });
-  rationale.push(`repayment history ${historyScore}/100 — ${historyNote}`);
+  rationale.push(`repayment history ${historyScore}/100 - ${historyNote}`);
 
-  /* 3 ── Payment-term risk curve: convex — each extra day costs more */
+  /* 3 ── Payment-term risk curve: convex - each extra day costs more */
   const t = p.termDays;
   const termScore = round1(clampNum(100 - 0.32 * t - 0.0018 * t * t, 12, 96));
   factors.push({
@@ -290,7 +290,7 @@ export function underwriteInvoice(payload) {
     weight: WEIGHTS.termRisk,
     score: termScore,
     impact: termScore >= 72 ? "positive" : termScore <= 48 ? "negative" : "neutral",
-    note: `${t}-day term on convex risk curve — longer terms compound exposure`,
+    note: `${t}-day term on convex risk curve - longer terms compound exposure`,
   });
   rationale.push(`payment term ${t}d scores ${termScore}/100 on convex duration curve`);
 
@@ -313,8 +313,8 @@ export function underwriteInvoice(payload) {
     logSize < 3 ? "dust band" :
     logSize < 4 ? "micro band" :
     logSize < 5.15 ? "core band" :
-    logSize < 6 ? "upper band — concentration watch" :
-    "jumbo band — heavy concentration risk";
+    logSize < 6 ? "upper band - concentration watch" :
+    "jumbo band - heavy concentration risk";
   factors.push({
     key: "invoiceSize",
     label: "Invoice Size Band",
@@ -323,7 +323,7 @@ export function underwriteInvoice(payload) {
     impact: sizeScore >= 72 ? "positive" : sizeScore <= 48 ? "negative" : "neutral",
     note: `${fmtUSD(p.faceValueUSD)} sits in ${sizeBandLabel}`,
   });
-  rationale.push(`face value ${fmtUSD(p.faceValueUSD)} → ${sizeBandLabel} (${sizeScore}/100)`);
+  rationale.push(`face value ${fmtUSD(p.faceValueUSD)} -> ${sizeBandLabel} (${sizeScore}/100)`);
 
   /* 6 ── Due-date proximity + term/due-date coherence */
   const daysToDue = Math.round(
@@ -334,20 +334,20 @@ export function underwriteInvoice(payload) {
   let proximityNote;
   if (!p.dueDateValid) {
     proximityScore = 35;
-    proximityNote = "due date unparseable — substituted asOf + term and flagged";
+    proximityNote = "due date unparseable - substituted asOf + term and flagged";
   } else if (daysToDue < 0) {
     proximityScore = 12;
     proximityNote = `invoice already ${-daysToDue}d past due at underwriting`;
   } else if (daysToDue < 7) {
     proximityScore = 48;
-    proximityNote = `due in ${daysToDue}d — minimal runway for streaming`;
+    proximityNote = `due in ${daysToDue}d - minimal runway for streaming`;
   } else {
     const base = daysToDue <= 150 ? 88 : Math.max(50, 74 - (daysToDue - 150) * 0.1);
     const alignPenalty = misalign > 5 ? Math.min(35, misalign * 1.2) : 0;
     proximityScore = round1(clampNum(base - alignPenalty, 5, 96));
     proximityNote =
       alignPenalty > 0
-        ? `due in ${daysToDue}d but term is ${p.termDays}d — ${misalign}d misalignment penalized`
+        ? `due in ${daysToDue}d but term is ${p.termDays}d - ${misalign}d misalignment penalized`
         : `due in ${daysToDue}d, consistent with ${p.termDays}d term`;
   }
   factors.push({
@@ -358,7 +358,7 @@ export function underwriteInvoice(payload) {
     impact: proximityScore >= 72 ? "positive" : proximityScore <= 48 ? "negative" : "neutral",
     note: proximityNote,
   });
-  rationale.push(`due-date check ${proximityScore}/100 — ${proximityNote}`);
+  rationale.push(`due-date check ${proximityScore}/100 - ${proximityNote}`);
 
   /* 7 ── Fraud signal scan (also produces the standalone fraudProbability) */
   const signals = [];
@@ -395,7 +395,7 @@ export function underwriteInvoice(payload) {
   }
   if (p.faceValueUSD < 1000) {
     fraud += 1.5;
-    signals.push("dust-sized invoice — spam/probe pattern");
+    signals.push("dust-sized invoice - spam/probe pattern");
   }
   if (p.dueDateValid && daysToDue < 0) {
     fraud += 2.5;
@@ -414,7 +414,7 @@ export function underwriteInvoice(payload) {
     impact: fraudScore >= 72 ? "positive" : fraudScore <= 48 ? "negative" : "neutral",
     note: fraudNote,
   });
-  rationale.push(`fraud scan: ${fraudProbability}% — ${fraudNote}`);
+  rationale.push(`fraud scan: ${fraudProbability}% - ${fraudNote}`);
 
   /* ── Composite score + derived economics ── */
   const composite = factors.reduce((acc, f) => acc + f.weight * f.score, 0);
@@ -458,7 +458,7 @@ export function underwriteInvoice(payload) {
   const auditHash = commitmentHash(canonical);
 
   rationale.push(
-    `commitment ${auditHash} → SynturaSentryRegistry.commitRiskScore()`
+    `commitment ${auditHash} -> SynturaSentryRegistry.commitRiskScore()`
   );
 
   return {

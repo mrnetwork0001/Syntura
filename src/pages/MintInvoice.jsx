@@ -41,9 +41,9 @@ import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
 const ANALYSIS_STAGES = [
   "Ingesting invoice metadata & debtor identity",
   "Scoring debtor credit heuristics & payment history",
-  "Scanning fraud signals — amount patterns, term mismatch",
+  "Scanning fraud signals - amount patterns, term mismatch",
   "Pricing discount rate & advance terms against tenor",
-  "Committing deterministic audit hash for on-chain proof",
+  "Committing deterministic audit hash for onchain proof",
 ];
 
 const STAGE_MS = 340;
@@ -67,7 +67,7 @@ const PIPELINE_STEPS = [
   },
   {
     icon: Fingerprint,
-    title: "Audit hash committed on-chain",
+    title: "Audit hash committed onchain",
     note: "A deterministic commitment makes every decision verifiable.",
   },
   {
@@ -151,7 +151,7 @@ export default function MintInvoice() {
 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
-  // idle → analyzing → result → minting → minted
+  // idle -> analyzing -> result -> minting -> minted
   const [phase, setPhase] = useState("idle");
   const [stageIndex, setStageIndex] = useState(0);
   const [result, setResult] = useState(null);
@@ -235,7 +235,7 @@ export default function MintInvoice() {
           setPhase("result");
         } catch {
           setPhase("idle");
-          setMintError("AI Sentry analysis failed — please retry.");
+          setMintError("AI Sentry analysis failed - please retry.");
         }
       }, ANALYSIS_STAGES.length * STAGE_MS + 240)
     );
@@ -251,7 +251,7 @@ export default function MintInvoice() {
       setPhase("minted");
     } catch {
       setPhase("result");
-      setMintError("Mint transaction failed — please retry.");
+      setMintError("Mint transaction failed - please retry.");
     }
   };
 
@@ -287,7 +287,7 @@ export default function MintInvoice() {
     >
       <SectionTitle
         title="Tokenize an Invoice"
-        subtitle="Turn a real-world receivable into a yield-streaming RWA NFT — underwritten by the AI Risk Sentry before it ever touches the chain."
+        subtitle="Turn a real-world receivable into a yield-streaming RWA NFT - underwritten by the AI Risk Sentry before it ever touches the chain."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -466,8 +466,8 @@ export default function MintInvoice() {
                   </div>
                   <div className="mt-5 flex items-center gap-2 rounded-xl border border-emeraldx/20 bg-emeraldx/5 p-3.5 text-xs text-slate-300">
                     <ShieldCheck size={14} className="shrink-0 text-emeraldx-soft" />
-                    Every underwriting decision is deterministic and committed on-chain
-                    as an audit hash — verifiable by anyone, forever.
+                    Every underwriting decision is deterministic and committed onchain
+                    as an audit hash - verifiable by anyone, forever.
                   </div>
                 </GlassCard>
               </motion.div>
@@ -625,7 +625,7 @@ export default function MintInvoice() {
 
                 <GlassCard>
                   <h3 className="mb-3 text-sm font-bold text-white">
-                    Sentry Rationale — Audit Trail
+                    Sentry Rationale - Audit Trail
                   </h3>
                   <div className="glass-inset scrollbar-thin max-h-52 space-y-1.5 overflow-y-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed">
                     {result.rationale.map((line, i) => (
@@ -639,7 +639,7 @@ export default function MintInvoice() {
                   <div className="mt-4 rounded-xl border border-violetx/25 bg-violetx/5 p-3.5">
                     <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-violetx-soft">
                       <Fingerprint size={12} />
-                      On-Chain Audit Commitment
+                      Onchain Audit Commitment
                     </p>
                     <p className="break-all font-mono text-[11px] text-slate-400">
                       {result.auditHash}
@@ -697,8 +697,8 @@ export default function MintInvoice() {
                       Invoice {invoiceTag} Minted
                     </h3>
                     <p className="mt-1 text-sm text-slate-400">
-                      ERC-721 RWA Invoice NFT live on BOTChain — AI underwriting
-                      committed on-chain.
+                      ERC-721 RWA Invoice NFT live on BOTChain - AI underwriting
+                      committed onchain.
                     </p>
 
                     <div className="mt-6 grid w-full grid-cols-2 gap-3 text-left sm:grid-cols-4">
@@ -726,7 +726,7 @@ export default function MintInvoice() {
 
                     <div className="mt-4 flex items-center gap-2 rounded-xl border border-violetx/20 bg-violetx/5 px-4 py-2.5 text-xs text-slate-300">
                       <Waves size={14} className="shrink-0 text-violetx-soft" />
-                      Status: Underwritten — start real-time payout streaming from the
+                      Status: Underwritten - start real-time payout streaming from the
                       Dashboard.
                     </div>
 

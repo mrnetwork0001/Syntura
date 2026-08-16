@@ -10,13 +10,13 @@ import AuditLog from "./pages/AuditLog.jsx";
 import Landing from "./pages/Landing.jsx";
 import { useSyntura } from "./context/SynturaStore.jsx";
 
-/** Page registry — keys are the canonical route ids shared with the Sidebar. */
+/** Page registry - keys are the canonical route ids shared with the Sidebar. */
 const PAGES = {
   dashboard: { title: "Dashboard", Component: Dashboard },
   mint: { title: "Mint RWA Invoice", Component: MintInvoice },
   underwriter: { title: "AI Risk Underwriter", Component: RiskUnderwriter },
   vaults: { title: "Liquidity Vaults", Component: LiquidityVaults },
-  audit: { title: "On-Chain Audit Log", Component: AuditLog },
+  audit: { title: "Onchain Audit Log", Component: AuditLog },
 };
 
 /** Slim strip under the topbar surfacing wallet/RPC failures with a dismiss. */
@@ -79,7 +79,7 @@ export default function App() {
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
 
-  // Sidebar logo → back to the landing page.
+  // Sidebar logo -> back to the landing page.
   const exitToLanding = useCallback(() => {
     setEntered(false);
     setSidebarOpen(false);
@@ -102,7 +102,7 @@ export default function App() {
         onToggleCollapse={toggleCollapsed}
       />
 
-      {/* Content column — offset by the fixed sidebar rail on desktop. */}
+      {/* Content column - offset by the fixed sidebar rail on desktop. */}
       <div
         className={`flex min-h-screen flex-col transition-[margin] duration-300 ${
           collapsed ? "lg:ml-[76px]" : "lg:ml-64"

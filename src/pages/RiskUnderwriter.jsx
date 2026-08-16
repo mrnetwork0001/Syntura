@@ -240,7 +240,7 @@ export default function RiskUnderwriter() {
               AI Risk Sentry <span className="text-gradient">Sandbox</span>
             </h1>
             <p className="mt-0.5 text-sm text-slate-400">
-              Adjust any input — the sentry re-underwrites instantly. No submit button, no black box.
+              Adjust any input - the sentry re-underwrites instantly. No submit button, no black box.
             </p>
           </div>
         </div>
@@ -453,7 +453,7 @@ export default function RiskUnderwriter() {
                   {result.auditHash}
                 </p>
                 <p className="mt-1.5 text-[11px] text-slate-500">
-                  Recomputable by anyone from the same payload — committed on-chain via{" "}
+                  Recomputable by anyone from the same payload - committed onchain via{" "}
                   <span className="font-mono text-slate-400">commitRiskScore()</span> so the score can never be
                   silently rewritten.
                 </p>
@@ -539,7 +539,7 @@ export default function RiskUnderwriter() {
               </div>
             ))}
             <div className="mt-3 flex gap-2.5 text-violetx-soft">
-              <span className="shrink-0 select-none text-slate-600">✓</span>
+              <span className="shrink-0 select-none text-slate-600">+</span>
               <span className="min-w-0 break-all">
                 audit_hash={result.auditHash}
               </span>
@@ -561,8 +561,8 @@ export default function RiskUnderwriter() {
               Sentry Network
             </h2>
             <p className="mt-0.5 text-sm text-slate-400">
-              AI agents registered on <span className="font-mono text-xs text-slate-300">SynturaSentryRegistry</span> —
-              only verified sentries can commit risk scores on-chain.
+              AI agents registered on <span className="font-mono text-xs text-slate-300">SynturaSentryRegistry</span> -
+              only verified sentries can commit risk scores onchain.
             </p>
           </div>
           <span className="font-mono text-xs text-slate-500">
@@ -678,11 +678,11 @@ export default function RiskUnderwriter() {
         </div>
       </div>
 
-      {/* Footnote: latest on-chain commitment reference */}
+      {/* Footnote: latest onchain commitment reference */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/70 bg-panel/20 px-5 py-3.5">
         <p className="flex items-center gap-2 text-xs text-slate-500">
           <ShieldCheck size={14} className="text-emeraldx-soft" />
-          Every underwriting emits <span className="font-mono text-slate-400">RiskScoreCommitted</span> on BOTChain —
+          Every underwriting emits <span className="font-mono text-slate-400">RiskScoreCommitted</span> on BOTChain -
           latest commitment:
         </p>
         <TxLink hash={invoices.find((i) => i.riskScore > 0)?.txHash} />
