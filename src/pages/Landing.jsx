@@ -1,7 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight,
   BrainCircuit,
   CheckCircle2,
   ExternalLink,
@@ -330,7 +329,7 @@ export default function Landing({ onLaunch }) {
             className="mt-7 flex flex-wrap items-center gap-3"
           >
             <button type="button" onClick={onLaunch} className="btn-primary">
-              Launch app <ArrowRight size={14} />
+              Launch app
             </button>
             <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="btn-ghost">
               <Github size={14} /> Browse source
@@ -454,7 +453,7 @@ export default function Landing({ onLaunch }) {
             underwrite, stream, settle - on mainnet.
           </p>
           <button type="button" onClick={onLaunch} className="btn-primary mt-8">
-            Launch app <ArrowRight size={14} />
+            Launch app
           </button>
         </motion.div>
       </section>
