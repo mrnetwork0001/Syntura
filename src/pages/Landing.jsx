@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  ArrowUpRight,
   BrainCircuit,
   CheckCircle2,
   ExternalLink,
@@ -9,508 +10,541 @@ import {
   Github,
   Hexagon,
   ShieldCheck,
-  Sparkles,
   Waves,
+  Zap,
 } from "lucide-react";
-import { Badge, GlassCard, ProgressBar, RiskGauge, SectionTitle } from "../components/ui/Glass.jsx";
-import { bpsToPercent, cn, formatPercent, formatUSD, shortHash } from "../lib/utils.js";
 import { useSyntura } from "../context/SynturaStore.jsx";
-import { SENTRY_MODEL_ID, underwriteInvoice } from "../agent/aiSentryAgent.js";
+import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
+import { BOTCHAIN } from "../lib/chain.js";
+import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 
-// Real underwriting run once at module load — pinned payload + asOf so the
-// terminal output is identical on every visit. Not a mockup.
+/* One real model run at module load — the hero terminal renders its actual
+   output, so the landing page is powered by the same engine as the dApp. */
 const SAMPLE_PAYLOAD = {
   debtorName: "Dangote Industries",
   supplierName: "Lagos Logistics Co.",
   faceValueUSD: 125000,
   termDays: 45,
+  dueDate: "2026-09-30",
   sector: "Logistics & Freight",
-  dueDate: "2026-09-25",
-  asOf: "2026-08-11",
+  debtorYearsTrading: 12,
+  priorInvoicesPaid: 9,
+  priorInvoicesDefaulted: 0,
 };
 const SAMPLE = underwriteInvoice(SAMPLE_PAYLOAD);
 
 const reveal = {
-  initial: { opacity: 0, y: 24 },
+  initial: { opacity: 0, y: 18 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, margin: "-80px" },
   transition: { duration: 0.5, ease: "easeOut" },
 };
 
-const NAV_LINKS = [
-  { label: "Protocol", id: "protocol" },
-  { label: "How It Works", id: "how-it-works" },
-  { label: "AI Sentry", id: "ai-sentry" },
-  { label: "For Investors", id: "for-investors" },
-];
+function goto(page) {
+  window.dispatchEvent(
+    new CustomEvent("syntura:navigate", { detail: { page } })
+  );
+}
+
+/* ── Small building blocks ─────────────────────────────────────────────── */
+
+function Eyebrow({ children, className }) {
+  return <p className={cn("eyebrow", className)}>{children}</p>;
+}
+
+function NavLink({ href, children }) {
+  return (
+    <a
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        document
+          .querySelector(href)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }}
+      className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
+    >
+      {children}
+    </a>
+  );
+}
+
+/* ── Hero terminal: live sentry evaluation ─────────────────────────────── */
+
+function SentryTerminal({ onLaunch }) {
+  const score = SAMPLE.riskScore;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
+      className="glass min-w-0 p-5"
+    >
+      <div className="flex items-center justify-between">
+        <Eyebrow>Invoice ingested</Eyebrow>
+        <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emeraldx" />
+          Live
+        </span>
+      </div>
+
+      <div className="glass-inset mt-4 p-4">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-electric/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-electric">
+            SYNV
+          </span>
+          <span className="font-mono text-[10px] text-slate-600">just now</span>
+        </div>
+        <p className="mt-2 text-sm font-semibold text-slate-200">
+          {SAMPLE_PAYLOAD.debtorName} — {formatUSD(SAMPLE_PAYLOAD.faceValueUSD)}{" "}
+          · {SAMPLE_PAYLOAD.termDays}-day term
+        </p>
+        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-600">
+          {SAMPLE_PAYLOAD.sector}
+        </p>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2.5">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
+          <Hexagon size={13} className="text-electric" />
+        </span>
+        <div className="min-w-0">
+          <Eyebrow className="tracking-[0.18em]">Syntura sentry evaluates</Eyebrow>
+          <p className="truncate text-xs text-slate-400">
+            What should this invoice cost today?
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-slate-500">
+          <span>Risk score</span>
+          <span>0 — 100</span>
+        </div>
+        <div className="relative mt-2 h-1.5 rounded-full bg-white/[0.06]">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violetx via-electric to-emeraldx"
+            style={{ width: `${score}%` }}
+          />
+          <span
+            className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-abyss bg-white"
+            style={{ left: `calc(${score}% - 7px)` }}
+          />
+        </div>
+        <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-wider text-electric">
+          {score}/100 · Tier {SAMPLE.tier}
+        </p>
+      </div>
+
+      <div className="mt-5 flex items-end justify-between gap-4">
+        <div>
+          <Eyebrow>Discount priced</Eyebrow>
+          <p className="mt-1 font-mono text-2xl font-bold text-emeraldx-soft">
+            {bpsToPercent(SAMPLE.discountRateBps)}
+          </p>
+        </div>
+        <span className="rounded-full border border-emeraldx/40 bg-emeraldx/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
+          Advance {Math.round(SAMPLE.advanceRatePct)}% of face
+        </span>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-violetx/30 bg-violetx/[0.07] px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Zap size={14} className="shrink-0 text-violetx-soft" />
+          <div className="min-w-0">
+            <p className="truncate font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+              1-click mint ready
+            </p>
+            <p className="truncate font-mono text-[9px] text-slate-600">
+              BOTChain · chain {BOTCHAIN.chainId} · demo until deployed
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={onLaunch} className="btn-primary shrink-0 !px-4 !py-2">
+          Mint
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
 
 const STAGES = [
   {
     n: "01",
+    fn: "mintInvoice()",
     title: "Tokenize",
     icon: FilePlus2,
-    border: "border-t-electric",
-    chip: "text-electric-soft bg-electric/10 border-electric/30",
+    tone: "text-electric",
     copy: "Each invoice is minted as an ERC-721 SYNV NFT on BOTChain — a verifiable on-chain claim on future cash flow.",
   },
   {
     n: "02",
+    fn: "underwriteInvoice()",
     title: "AI Underwrite",
     icon: BrainCircuit,
-    border: "border-t-violetx",
-    chip: "text-violetx-soft bg-violetx/10 border-violetx/30",
-    copy: "The AI Sentry computes a deterministic risk score and discount rate, committing an audit hash on-chain.",
+    tone: "text-violetx-soft",
+    copy: "The AI Sentry prices risk and discount rate deterministically, committing an audit hash of its reasoning on-chain.",
   },
   {
     n: "03",
+    fn: "streamPayout()",
     title: "Stream",
     icon: Waves,
-    border: "border-t-emeraldx",
-    chip: "text-emeraldx-soft bg-emeraldx/10 border-emeraldx/30",
+    tone: "text-emeraldx-soft",
     copy: "The liquidity vault streams the advance to the supplier in real time — no 60-day wait for working capital.",
   },
   {
     n: "04",
+    fn: "settleInvoice()",
     title: "Settle",
     icon: CheckCircle2,
-    border: "border-t-amber-500",
-    chip: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    tone: "text-amber-400",
     copy: "On payment, an atomic 90/7/3 split pays supplier, pool and treasury — LPs earn real-world yield.",
   },
 ];
 
-const SENTRY_POINTS = [
-  "Fully deterministic — identical input always yields an identical score and audit hash.",
-  "Seven weighted risk factors plus fraud heuristics, every weight and rationale exposed.",
-  "Every decision committed on-chain via SynturaSentryRegistry.commitRiskScore().",
+const CONTRACTS_GRID = [
+  {
+    name: "SynturaInvoiceNFT",
+    chip: "ERC-721 · SYNV",
+    copy: "The tokenized invoice registry: face value, debtor, due date, risk score and settlement state — every field a public, on-chain claim.",
+  },
+  {
+    name: "SynturaVault",
+    chip: "9000/700/300 BPS",
+    copy: "Liquidity deposits, real-time advance streaming and the atomic settlement waterfall, guarded by reentrancy checks and pull-payments.",
+  },
+  {
+    name: "SynturaSentryRegistry",
+    chip: "AUDIT ANCHORS",
+    copy: "On-chain identity for AI agents. Only verified sentries underwrite, and every risk score is committed with a reproducible audit hash.",
+  },
+  {
+    name: SENTRY_MODEL_ID,
+    chip: "0 DEPS · DETERMINISTIC",
+    copy: "The underwriting engine itself — seven weighted factors plus fraud heuristics, identical output for identical input, in browser or Node.",
+  },
 ];
 
-const CHAIN_CHIPS = [
-  { label: "Chain ID 677 (0x2a5)" },
-  { label: "RPC rpc.botchain.ai" },
-  { label: "Explorer scan.botchain.ai", href: "https://scan.botchain.ai" },
-  { label: "EVM · Solidity 0.8.24" },
+const TRUST = [
+  {
+    title: "Deterministic",
+    copy: "No black box. Identical invoice payloads always produce identical scores and an identical audit hash — anyone can re-run the open-source model and verify what was committed on-chain.",
+  },
+  {
+    title: "Chain-pinned",
+    copy: `Every contract call targets BOTChain (chain ID ${BOTCHAIN.chainId}). The frontend refuses to pretend: addresses, hashes and events deep-link to the public explorer.`,
+  },
+  {
+    title: "Honest by default",
+    copy: "Until contracts are deployed, the dApp labels itself Demo Simulation in the topbar — flows are fully clickable, and nothing masquerades as a live transaction.",
+  },
 ];
-
-function scrollToId(e, id) {
-  e.preventDefault();
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-}
-
-function Wordmark() {
-  return (
-    <span className="flex items-center gap-2.5">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-electric to-violetx text-white shadow-glow-blue">
-        <Hexagon size={18} />
-      </span>
-      <span className="text-lg font-bold tracking-tight text-white">Syntura</span>
-    </span>
-  );
-}
-
-function SectionHeading({ eyebrow, title, subtitle }) {
-  return (
-    <div className="mb-12 max-w-2xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-electric-soft">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{title}</h2>
-      {subtitle && <p className="mt-3 text-slate-400">{subtitle}</p>}
-    </div>
-  );
-}
 
 export default function Landing({ onLaunch }) {
   const { invoices, vault } = useSyntura();
 
   const heroStats = [
-    { value: String(invoices.length), label: "Invoices tokenized" },
-    { value: formatUSD(vault.totalLiquidityUSD, { compact: true }), label: "Total liquidity" },
-    { value: formatPercent(vault.averageYieldAPY), label: "Average APY" },
-    { value: "677", label: "Chain ID" },
+    { label: "Invoices", value: String(invoices.length) },
+    {
+      label: "Total liquidity",
+      value: formatUSD(vault.totalLiquidityUSD, { compact: true }),
+    },
+    { label: "Average APY", value: formatPercent(vault.averageYieldAPY) },
+    { label: "Chain ID", value: String(BOTCHAIN.chainId) },
   ];
 
   return (
     <div className="min-h-screen">
-      {/* ── Sticky nav ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/60 bg-abyss/70 backdrop-blur-xl">
+      {/* ── Nav ──────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-abyss/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <a href="#protocol" onClick={(e) => scrollToId(e, "protocol")} aria-label="Syntura — top">
-            <Wordmark />
-          </a>
-          <nav className="hidden items-center gap-8 md:flex">
-            {NAV_LINKS.map((l) => (
-              <a
-                key={l.id}
-                href={`#${l.id}`}
-                onClick={(e) => scrollToId(e, l.id)}
-                className="text-sm font-medium text-slate-400 transition-colors hover:text-white"
-              >
-                {l.label}
-              </a>
-            ))}
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+              <Hexagon size={16} className="text-electric" strokeWidth={2.5} />
+            </span>
+            <span className="text-sm font-extrabold tracking-tight text-white">
+              SYNTURA
+            </span>
+          </div>
+          <nav className="hidden items-center gap-7 md:flex">
+            <NavLink href="#pipeline">Pipeline</NavLink>
+            <NavLink href="#contracts">Contracts</NavLink>
+            <NavLink href="#trust">Trust</NavLink>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Syntura on GitHub"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/70 bg-panel/40 text-slate-300 transition-colors hover:border-electric/50 hover:text-white"
+              className="btn-ghost hidden !px-3.5 !py-2 sm:inline-flex"
             >
-              <Github size={18} />
+              View source <ArrowUpRight size={13} />
             </a>
-            <button type="button" onClick={onLaunch} className="btn-primary">
-              Launch dApp
+            <button type="button" onClick={onLaunch} className="btn-primary !px-4 !py-2">
+              Launch app
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── Hero ───────────────────────────────────────────────────────── */}
-      <section id="protocol" className="relative scroll-mt-24 overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 bg-grid-faint [background-size:48px_48px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
-          aria-hidden="true"
-        />
-        <div className="relative mx-auto flex min-h-[88vh] max-w-6xl flex-col items-center justify-center px-6 py-24 text-center">
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pb-28 lg:pt-24">
+        <div className="min-w-0">
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="inline-flex items-center gap-2 rounded-full border border-violetx/40 bg-violetx/10 px-4 py-1.5 text-xs font-semibold text-violetx-soft"
+            transition={{ duration: 0.45 }}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400"
           >
-            <Sparkles size={14} />
-            BOTChain Builder Challenge #2 · Season 2 — AI × RWA
+            <span className="h-1.5 w-1.5 rounded-full bg-emeraldx" />
+            BOTChain Builder Challenge · Season 2 — AI × RWA
           </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08, ease: "easeOut" }}
-            className="mt-8 text-5xl font-extrabold leading-[1.06] tracking-tight text-white sm:text-6xl lg:text-7xl"
+            transition={{ duration: 0.55, delay: 0.08 }}
+            className="mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]"
           >
-            Real-world invoices,
-            <br />
-            <span className="text-gradient">{"underwritten by AI, paid in real time."}</span>
+            We turn 60-day invoices into{" "}
+            <span className="text-gradient">60-second liquidity.</span>
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.16, ease: "easeOut" }}
-            className="mt-6 max-w-2xl text-base text-slate-400 sm:text-lg"
+            transition={{ duration: 0.55, delay: 0.16 }}
+            className="mt-5 max-w-xl text-[15px] leading-relaxed text-slate-400"
           >
-            Syntura tokenizes B2B invoices as RWA NFTs on BOTChain, prices their risk with a
-            deterministic AI underwriting agent, and streams working capital to suppliers the moment
-            the audit clears — settling every invoice with an atomic 90/7/3 split.
+            Syntura is an AI-underwritten invoice protocol. It tokenizes B2B
+            receivables as RWA NFTs, prices their risk with a deterministic
+            underwriting agent, and streams working capital to suppliers the
+            moment the audit clears — settling every invoice with an atomic
+            90/7/3 split. Auditable, always.
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.24, ease: "easeOut" }}
-            className="mt-10 flex flex-wrap items-center justify-center gap-4"
+            transition={{ duration: 0.55, delay: 0.24 }}
+            className="mt-7 flex flex-wrap items-center gap-3"
           >
-            <button type="button" onClick={onLaunch} className="btn-primary px-7 py-3 text-base">
-              Launch dApp
-              <ArrowRight size={18} />
+            <button type="button" onClick={onLaunch} className="btn-primary">
+              Launch app <ArrowRight size={14} />
             </button>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="btn-ghost px-7 py-3 text-base">
-              <Github size={18} />
-              View source
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="btn-ghost">
+              <Github size={14} /> Browse source
             </a>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.34, ease: "easeOut" }}
-            className="glass mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 rounded-2xl px-8 py-4 sm:rounded-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.36 }}
+            className="mt-10 grid grid-cols-2 gap-6 border-t border-white/[0.06] pt-6 sm:grid-cols-4"
           >
             {heroStats.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="text-lg font-bold tracking-tight text-white">{s.value}</p>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</p>
+              <div key={s.label} className="min-w-0">
+                <p className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">
+                  {s.label}
+                </p>
+                <p className="mt-1.5 font-mono text-2xl font-bold text-white">
+                  {s.value}
+                </p>
               </div>
             ))}
           </motion.div>
         </div>
+
+        <SentryTerminal onLaunch={onLaunch} />
       </section>
 
-      {/* ── Protocol in action ─────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 pb-24">
+      {/* ── Pipeline ─────────────────────────────────────────────────── */}
+      <section id="pipeline" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
         <motion.div {...reveal}>
-          <GlassCard className="p-6 sm:p-10">
-            <div className="grid items-center gap-6 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
-              <div className="glass-inset p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-slate-400">#SYNV-006</span>
-                  <Badge status="Underwritten" />
-                </div>
-                <p className="mt-4 text-2xl font-bold tracking-tight text-white">{formatUSD(67500)}</p>
-                <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Invoice face value · 45-day term
-                </p>
-              </div>
-
-              <ArrowRight size={20} className="mx-auto rotate-90 text-slate-600 md:rotate-0" />
-
-              <div className="flex flex-col items-center py-2">
-                <RiskGauge score={87} size={132} />
-                <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  AI Sentry
-                </p>
-              </div>
-
-              <ArrowRight size={20} className="mx-auto rotate-90 text-slate-600 md:rotate-0" />
-
-              <div className="glass-inset p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Streaming advance
-                  </span>
-                  <Badge status="Streaming" />
-                </div>
-                <ProgressBar value={62} accent="violet" className="mt-5" />
-                <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                  <ArrowRight size={13} className="text-emeraldx-soft" />
-                  90/7/3 settlement
-                </div>
-              </div>
-            </div>
-          </GlassCard>
+          <Eyebrow>The pipeline</Eyebrow>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            Four functions, every invoice.
+          </h2>
         </motion.div>
-      </section>
-
-      {/* ── How it works ───────────────────────────────────────────────── */}
-      <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-        <motion.div {...reveal}>
-          <SectionHeading
-            eyebrow="Pipeline"
-            title="From invoice to liquidity in four stages"
-            subtitle="One protocol carries every invoice from mint to settlement — each stage anchored on BOTChain."
-          />
-        </motion.div>
-        <div className="grid gap-5 md:grid-cols-4">
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {STAGES.map((s, i) => (
             <motion.div
               key={s.n}
               {...reveal}
-              transition={{ ...reveal.transition, delay: i * 0.08 }}
-              className={cn("glass border-t-2 p-6", s.border)}
+              transition={{ ...reveal.transition, delay: i * 0.07 }}
+              className="glass glass-hover min-w-0 p-6"
             >
               <div className="flex items-center justify-between">
-                <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", s.chip)}>
-                  <s.icon size={18} />
-                </span>
-                <span className="font-mono text-xs text-slate-600">{s.n}</span>
+                <span className={cn("font-mono text-xl font-bold", s.tone)}>{s.n}</span>
+                <s.icon size={16} className="text-slate-600" />
               </div>
               <h3 className="mt-5 text-base font-bold text-white">{s.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{s.copy}</p>
+              <p className={cn("mt-1 font-mono text-[11px]", s.tone)}>{s.fn}</p>
+              <p className="mt-3 text-[13px] leading-relaxed text-slate-400">{s.copy}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* ── AI Sentry deep-dive ────────────────────────────────────────── */}
-      <section id="ai-sentry" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <motion.div {...reveal} className="min-w-0">
-            <SectionHeading
-              eyebrow="AI Risk Sentry"
-              title="An underwriter you can audit"
-              subtitle={`${SENTRY_MODEL_ID} prices every invoice with explainable, reproducible math — no black box between risk and rate.`}
-            />
-            <ul className="space-y-4">
-              {SENTRY_POINTS.map((point) => (
-                <li key={point} className="flex items-start gap-3">
-                  <ShieldCheck size={18} className="mt-0.5 shrink-0 text-emeraldx-soft" />
-                  <span className="text-sm leading-relaxed text-slate-300">{point}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          <motion.div
-            {...reveal}
-            transition={{ ...reveal.transition, delay: 0.1 }}
-            className="min-w-0"
-          >
-            <div className="glass-inset overflow-hidden">
-              <div className="flex items-center gap-2 border-b border-slate-800/80 px-4 py-3">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-500/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emeraldx/70" />
-                <span className="ml-2 font-mono text-[11px] text-slate-500">
-                  sentry — underwrite "{SAMPLE_PAYLOAD.debtorName}"
-                </span>
-              </div>
-              <div className="max-h-80 space-y-1.5 overflow-y-auto p-4 font-mono text-xs leading-relaxed scrollbar-thin">
-                {SAMPLE.rationale.map((line, i) => (
-                  <p key={i} className="[overflow-wrap:anywhere] text-slate-400">
-                    <span className="mr-1.5 text-slate-600">›</span>
-                    {line}
-                  </p>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-2 border-t border-slate-800/80 px-4 py-3 font-mono text-xs">
-                <div>
-                  <p className="text-slate-500">riskScore</p>
-                  <p className="mt-0.5 font-semibold text-emeraldx-soft">{SAMPLE.riskScore}/100</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">discount</p>
-                  <p className="mt-0.5 font-semibold text-electric-soft">{bpsToPercent(SAMPLE.discountRateBps)}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">auditHash</p>
-                  <p className="mt-0.5 font-semibold text-violetx-soft">{shortHash(SAMPLE.auditHash)}</p>
-                </div>
-              </div>
-            </div>
-            <p className="mt-3 text-center text-xs text-slate-500">
-              Live output from the actual model in this repo — not a mockup.
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── For investors ──────────────────────────────────────────────── */}
-      <section id="for-investors" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <motion.div {...reveal} className="min-w-0">
-            <SectionHeading
-              eyebrow="Liquidity providers"
-              title="Real-world yield, streamed on-chain"
-              subtitle="Every settled invoice routes 7% of its face value to the liquidity pool. Yield comes from real B2B cash flows — invoices paid by real debtors — not token emissions."
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="glass-inset p-4">
-                <p className="text-2xl font-bold tracking-tight text-white">
-                  {formatPercent(vault.averageYieldAPY)}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Average APY
-                </p>
-              </div>
-              <div className="glass-inset p-4">
-                <p className="text-2xl font-bold tracking-tight text-white">
-                  {formatPercent(vault.poolUtilizationPct, 1)}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Pool utilization
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div {...reveal} transition={{ ...reveal.transition, delay: 0.1 }}>
-            <GlassCard className="p-8">
-              <SectionTitle
-                title="Atomic settlement split"
-                subtitle="Executed in a single transaction on every settlement."
-              />
-              <div className="flex h-5 overflow-hidden rounded-full">
-                <div className="bg-electric" style={{ width: "90%" }} />
-                <div className="bg-violetx" style={{ width: "7%" }} />
-                <div className="bg-emeraldx" style={{ width: "3%" }} />
-              </div>
-              <div className="mt-5 space-y-2.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-slate-300">
-                    <span className="h-2.5 w-2.5 rounded-full bg-electric" />
-                    Supplier payout
-                  </span>
-                  <span className="font-semibold text-white">90%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-slate-300">
-                    <span className="h-2.5 w-2.5 rounded-full bg-violetx" />
-                    Liquidity pool
-                  </span>
-                  <span className="font-semibold text-white">7%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-slate-300">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emeraldx" />
-                    Protocol treasury
-                  </span>
-                  <span className="font-semibold text-white">3%</span>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Built on BOTChain ──────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <motion.div {...reveal} className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-electric-soft">
-            Built on BOTChain
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {CHAIN_CHIPS.map((chip) =>
-              chip.href ? (
-                <a
-                  key={chip.label}
-                  href={chip.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="glass inline-flex items-center gap-1.5 rounded-full px-4 py-2 font-mono text-xs text-slate-300 transition-colors hover:border-electric/40 hover:text-white"
-                >
-                  {chip.label}
-                  <ExternalLink size={12} />
-                </a>
-              ) : (
-                <span
-                  key={chip.label}
-                  className="glass inline-flex items-center rounded-full px-4 py-2 font-mono text-xs text-slate-300"
-                >
-                  {chip.label}
-                </span>
-              )
-            )}
-          </div>
-          <p className="mt-6 text-sm text-slate-400">
-            Track 1 (AI-native agents) × Track 2 (RWA applications) — one protocol.
-          </p>
-        </motion.div>
-      </section>
-
-      {/* ── Final CTA ──────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-24">
-        <motion.div {...reveal}>
-          <GlassCard className="p-12 text-center shadow-glow-blue sm:p-16">
-            <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              See the whole protocol run <span className="text-gradient">in 60 seconds.</span>
+      {/* ── Contracts ────────────────────────────────────────────────── */}
+      <section id="contracts" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
+        <div className="grid items-end gap-6 lg:grid-cols-[1fr_auto]">
+          <motion.div {...reveal}>
+            <Eyebrow>Protocol surface</Eyebrow>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              Three contracts. One audit trail.
             </h2>
-            <p className="mt-4 text-slate-400">No wallet needed — demo mode is fully clickable.</p>
-            <button type="button" onClick={onLaunch} className="btn-primary mt-8 px-8 py-3.5 text-base">
-              Launch dApp
-              <ArrowRight size={18} />
-            </button>
-          </GlassCard>
+          </motion.div>
+          <motion.p {...reveal} className="max-w-sm text-[13px] leading-relaxed text-slate-500">
+            Every lifecycle event — mint, underwrite, stream, settle — emits an
+            indexed event the in-app audit log renders as an explorer-linked
+            timeline.
+          </motion.p>
+        </div>
+        <div className="mt-10 grid gap-5 md:grid-cols-2">
+          {CONTRACTS_GRID.map((c, i) => (
+            <motion.div
+              key={c.name}
+              {...reveal}
+              transition={{ ...reveal.transition, delay: i * 0.06 }}
+              className="glass glass-hover min-w-0 p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-mono text-sm font-semibold text-electric">{c.name}</p>
+                <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                  {c.chip}
+                </span>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-slate-400">{c.copy}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Trust ────────────────────────────────────────────────────── */}
+      <section id="trust" className="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
+        <div className="grid gap-5 md:grid-cols-3">
+          {TRUST.map((t, i) => (
+            <motion.div
+              key={t.title}
+              {...reveal}
+              transition={{ ...reveal.transition, delay: i * 0.07 }}
+              className="glass min-w-0 p-6"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck size={15} className="text-emeraldx-soft" />
+                <h3 className="text-sm font-bold text-white">{t.title}</h3>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-slate-400">{t.copy}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Final CTA ────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <motion.div {...reveal} className="glass px-6 py-16 text-center">
+          <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            The gap between invoice and cash{" "}
+            <span className="text-gradient">closes fast.</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-md text-sm text-slate-400">
+            No wallet needed — the demo book is fully clickable, end to end.
+          </p>
+          <button type="button" onClick={onLaunch} className="btn-primary mt-8">
+            Launch app <ArrowRight size={14} />
+          </button>
         </motion.div>
       </section>
 
-      {/* ── Footer ─────────────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-800/60">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8">
-          <Wordmark />
-          <p className="text-xs text-slate-500">
-            Apache-2.0 · Built by Ifeanyichukwu Onwo (mrnetwork) for the BOTChain Builder Challenge #2
-          </p>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-white"
-          >
-            <Github size={14} />
-            GitHub
-          </a>
+      {/* ── Footer ───────────────────────────────────────────────────── */}
+      <footer className="border-t border-white/[0.06]">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+                <Hexagon size={16} className="text-electric" strokeWidth={2.5} />
+              </span>
+              <span className="text-sm font-extrabold tracking-tight text-white">SYNTURA</span>
+            </div>
+            <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-slate-500">
+              AI-underwritten RWA invoices on BOTChain. Tokenize, price, stream,
+              settle — with every decision auditable.
+            </p>
+          </div>
+          {[
+            {
+              head: "Product",
+              links: [
+                ["Dashboard", () => goto("dashboard")],
+                ["Mint invoice", () => goto("mint")],
+                ["AI underwriter", () => goto("underwriter")],
+                ["Liquidity vaults", () => goto("vaults")],
+                ["Audit log", () => goto("audit")],
+              ],
+            },
+            {
+              head: "Ecosystem",
+              links: [
+                ["BOTChain explorer", BOTCHAIN.explorerUrl],
+                ["ChainList · 677", "https://chainlist.org/chain/677"],
+                ["RPC endpoint", BOTCHAIN.rpcUrl],
+              ],
+            },
+            {
+              head: "Resources",
+              links: [
+                ["GitHub", GITHUB_URL],
+                ["Apache-2.0 license", `${GITHUB_URL}/blob/main/LICENSE`],
+                ["README", `${GITHUB_URL}#readme`],
+              ],
+            },
+          ].map((col) => (
+            <div key={col.head} className="min-w-0">
+              <Eyebrow>{col.head}</Eyebrow>
+              <ul className="mt-4 space-y-2.5">
+                {col.links.map(([label, target]) => (
+                  <li key={label}>
+                    {typeof target === "function" ? (
+                      <button
+                        type="button"
+                        onClick={target}
+                        className="text-[13px] text-slate-500 transition-colors hover:text-white"
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      <a
+                        href={target}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[13px] text-slate-500 transition-colors hover:text-white"
+                      >
+                        {label} <ExternalLink size={11} />
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-white/[0.06]">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
+            <p className="font-mono text-[10px] leading-relaxed text-slate-600">
+              Demo simulation — on-chain writes are simulated until contracts are
+              deployed. Built by Ifeanyichukwu Onwo (mrnetwork) · Apache-2.0.
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-slate-600">
+              BOTChain · Chain {BOTCHAIN.chainId}
+            </p>
+          </div>
         </div>
       </footer>
     </div>
