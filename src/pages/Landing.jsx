@@ -2,7 +2,6 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  ArrowUpRight,
   BrainCircuit,
   CheckCircle2,
   ExternalLink,
@@ -271,24 +270,20 @@ export default function Landing({ onLaunch }) {
               SYNTURA
             </span>
           </div>
-          <nav className="hidden items-center gap-7 md:flex">
-            <NavLink href="#pipeline">Pipeline</NavLink>
-            <NavLink href="#contracts">Contracts</NavLink>
-            <NavLink href="#trust">Trust</NavLink>
-          </nav>
-          <div className="flex items-center gap-2.5">
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-ghost hidden !px-3.5 !py-2 sm:inline-flex"
+          <nav className="flex items-center gap-7">
+            <span className="hidden items-center gap-7 md:flex">
+              <NavLink href="#pipeline">Pipeline</NavLink>
+              <NavLink href="#contracts">Contracts</NavLink>
+              <NavLink href="#trust">Trust</NavLink>
+            </span>
+            <button
+              type="button"
+              onClick={() => goto("docs")}
+              className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
             >
-              View source <ArrowUpRight size={13} />
-            </a>
-            <button type="button" onClick={onLaunch} className="btn-primary !px-4 !py-2">
-              Launch app
+              Docs
             </button>
-          </div>
+          </nav>
         </div>
       </header>
 
@@ -501,6 +496,7 @@ export default function Landing({ onLaunch }) {
             {
               head: "Resources",
               links: [
+                ["Documentation", () => goto("docs")],
                 ["GitHub", GITHUB_URL],
                 ["Apache-2.0 license", `${GITHUB_URL}/blob/main/LICENSE`],
                 ["README", `${GITHUB_URL}#readme`],
