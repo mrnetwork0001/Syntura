@@ -16,10 +16,10 @@ export function GlassCard({ className, children, hover = false, ...props }) {
 /** Animated stat card with icon, value, label and optional delta. */
 export function StatCard({ icon: Icon, label, value, delta, accent = "electric", index = 0 }) {
   const accents = {
-    electric: "text-electric-soft bg-electric/10 border-electric/30",
-    emerald: "text-emeraldx-soft bg-emeraldx/10 border-emeraldx/30",
-    violet: "text-violetx-soft bg-violetx/10 border-violetx/30",
-    amber: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    electric: "text-electric bg-white/[0.04] border-white/10",
+    emerald: "text-emeraldx-soft bg-white/[0.04] border-white/10",
+    violet: "text-violetx-soft bg-white/[0.04] border-white/10",
+    amber: "text-amber-400 bg-white/[0.04] border-white/10",
   };
   const positive = typeof delta === "number" ? delta >= 0 : null;
   return (
@@ -50,8 +50,8 @@ export function StatCard({ icon: Icon, label, value, delta, accent = "electric",
           </span>
         )}
       </div>
-      <p className="mt-4 text-2xl font-bold tracking-tight text-white">{value}</p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
+      <p className="mt-4 font-mono text-2xl font-bold tracking-tight text-white">{value}</p>
+      <p className="mt-1 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
         {label}
       </p>
     </motion.div>
@@ -72,7 +72,7 @@ export function Badge({ status, className }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
         tones[status] || tones.Pending,
         className
       )}
@@ -170,7 +170,7 @@ export function RiskGauge({ score, size = 148, label = "AI Risk Score" }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-3xl font-extrabold text-white">{Math.round(pct)}</span>
-        <span className="mt-0.5 max-w-[90px] text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <span className="mt-0.5 max-w-[90px] text-center font-mono text-[9px] font-semibold uppercase tracking-widest text-slate-500">
           {label}
         </span>
       </div>

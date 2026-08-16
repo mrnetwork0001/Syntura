@@ -8,7 +8,7 @@ function ModeChip({ liveMode }) {
   return (
     <span
       className={cn(
-        "hidden items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold sm:inline-flex",
+        "hidden items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider sm:inline-flex",
         liveMode
           ? "border-emeraldx/40 bg-emeraldx/10 text-emeraldx-soft"
           : "border-amber-500/40 bg-amber-500/10 text-amber-300"
@@ -27,8 +27,8 @@ function ModeChip({ liveMode }) {
 
 function NetworkChip() {
   return (
-    <span className="hidden items-center gap-1.5 rounded-full border border-slate-700/70 bg-panel/40 px-3 py-1 text-xs font-semibold text-slate-300 md:inline-flex">
-      <Globe size={13} className="text-electric-soft" />
+    <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-300 md:inline-flex">
+      <Globe size={13} className="text-electric" />
       {BOTCHAIN.name}
     </span>
   );
@@ -40,7 +40,7 @@ function WalletControl() {
   if (wallet.address) {
     return (
       <div
-        className="flex items-center gap-2.5 rounded-xl border border-slate-700/60 bg-panel/40 px-3.5 py-2 backdrop-blur-xl"
+        className="flex items-center gap-2.5 rounded-md border border-white/10 bg-white/[0.03] px-3.5 py-2"
         title={wallet.address}
       >
         <span className="relative flex h-2 w-2">

@@ -23,14 +23,14 @@ const NAV_ITEMS = [
 function Brand() {
   return (
     <div className="flex items-center gap-3 px-2">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-electric to-violetx shadow-glow-blue">
-        <Hexagon size={22} className="text-white" strokeWidth={2.25} />
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+        <Hexagon size={20} className="text-electric" strokeWidth={2.25} />
       </div>
       <div className="min-w-0">
-        <p className="text-gradient text-xl font-extrabold leading-tight tracking-tight">
+        <p className="text-lg font-extrabold leading-tight tracking-tight text-white">
           Syntura
         </p>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-slate-500">
           AI × RWA Protocol
         </p>
       </div>
@@ -50,10 +50,10 @@ function NavList({ active, onNavigate, variant }) {
             onClick={() => onNavigate(key)}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "relative flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors duration-200",
+              "relative flex w-full items-center gap-3 rounded-md px-3.5 py-2.5 text-left font-mono text-[11px] font-semibold uppercase tracking-wider transition-colors duration-200",
               isActive
                 ? "text-white"
-                : "text-slate-400 hover:bg-panel/40 hover:text-slate-200"
+                : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
             )}
           >
             {isActive && (
@@ -61,14 +61,14 @@ function NavList({ active, onNavigate, variant }) {
                 // Distinct layoutId per variant — desktop + mobile mount together.
                 layoutId={`nav-active-${variant}`}
                 transition={{ type: "spring", stiffness: 380, damping: 34 }}
-                className="absolute inset-0 rounded-xl border border-electric/50 bg-panel/50 shadow-glow-blue backdrop-blur-xl"
+                className="absolute inset-0 rounded-md border border-electric/40 bg-electric/[0.06]"
               />
             )}
             <Icon
-              size={18}
+              size={16}
               className={cn(
                 "relative z-10 shrink-0",
-                isActive ? "text-electric-soft" : "text-slate-500"
+                isActive ? "text-electric" : "text-slate-600"
               )}
             />
             <span className="relative z-10">{label}</span>
@@ -88,10 +88,12 @@ function NetworkFooter() {
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emeraldx" />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-slate-200">
+          <p className="truncate font-mono text-[11px] font-semibold text-slate-200">
             {BOTCHAIN.name}
           </p>
-          <p className="text-[10px] text-slate-500">Network operational</p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-slate-500">
+            Network operational
+          </p>
         </div>
       </div>
       <p className="px-2 text-[10px] leading-relaxed text-slate-600">
