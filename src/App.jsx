@@ -8,6 +8,7 @@ import RiskUnderwriter from "./pages/RiskUnderwriter.jsx";
 import LiquidityVaults from "./pages/LiquidityVaults.jsx";
 import AuditLog from "./pages/AuditLog.jsx";
 import Landing from "./pages/Landing.jsx";
+import Docs from "./pages/Docs.jsx";
 import { useSyntura } from "./context/SynturaStore.jsx";
 
 /** Page registry - keys are the canonical route ids shared with the Sidebar. */
@@ -44,7 +45,7 @@ function ChainErrorBanner() {
 export default function App() {
   const [activePage, setActivePage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [entered, setEntered] = useState(false);
+  const [view, setView] = useState("landing"); // landing | app | docs
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("syntura:sidebar-collapsed") === "1"
   );
@@ -67,8 +68,11 @@ export default function App() {
   useEffect(() => {
     const onNavigate = (e) => {
       const key = e.detail?.page;
-      if (PAGES[key]) {
-        setEntered(true); // deep links skip the landing page
+      if (key === "docs" || key === "landing") {
+        setView(key === "docs" ? "docs" : "landing");
+        window.scrollTo(0, 0);
+      } else if (PAGES[key]) {
+        setView("app"); // deep links skip the landing page
         handleNavigate(key);
       }
     };
@@ -81,14 +85,15 @@ export default function App() {
 
   // Sidebar logo -> back to the landing page.
   const exitToLanding = useCallback(() => {
-    setEntered(false);
+    setView("landing");
     setSidebarOpen(false);
     window.scrollTo(0, 0);
   }, []);
 
   const { title, Component } = PAGES[activePage] ?? PAGES.dashboard;
 
-  if (!entered) return <Landing onLaunch={() => setEntered(true)} />;
+  if (view === "landing") return <Landing onLaunch={() => setView("app")} />;
+  if (view === "docs") return <Docs />;
 
   return (
     <div className="min-h-screen">
