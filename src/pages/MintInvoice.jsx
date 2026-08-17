@@ -6,7 +6,6 @@ import {
   Loader2,
   CheckCircle2,
   Fingerprint,
-  Hexagon,
   ShieldCheck,
   TrendingUp,
   TrendingDown,
@@ -37,6 +36,7 @@ import {
 import { SECTORS } from "../lib/constants.js";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
+import BrandMark from "../components/ui/BrandMark.jsx";
 
 const ANALYSIS_STAGES = [
   "Ingesting invoice metadata & debtor identity",
@@ -71,7 +71,7 @@ const PIPELINE_STEPS = [
     note: "A deterministic commitment makes every decision verifiable.",
   },
   {
-    icon: Hexagon,
+    icon: BrandMark,
     title: "ERC-721 minted on BOTChain",
     note: "Your invoice becomes a yield-streaming RWA NFT instantly.",
   },
@@ -720,7 +720,7 @@ export default function MintInvoice() {
                       </>
                     ) : (
                       <>
-                        <Hexagon size={16} />
+                        <BrandMark size={16} />
                         Mint RWA Invoice NFT on BOTChain
                       </>
                     )}

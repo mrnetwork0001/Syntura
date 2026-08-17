@@ -5,11 +5,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Fingerprint,
-  Hexagon,
 } from "lucide-react";
 import { BOTCHAIN, CONTRACTS } from "../lib/chain.js";
 import { cn } from "../lib/utils.js";
 import { useSyntura } from "../context/SynturaStore.jsx";
+import BrandMark from "../components/ui/BrandMark.jsx";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 
@@ -608,7 +608,7 @@ export default function Docs() {
             aria-label="Back to landing page"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition-colors group-hover:border-electric/40">
-              <Hexagon size={16} className="text-electric" strokeWidth={2.5} />
+              <BrandMark size={18} />
             </span>
             <span className="text-sm font-extrabold tracking-tight text-white">
               SYNTURA

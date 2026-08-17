@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
   ChevronRight,
-  Hexagon,
   LayoutDashboard,
   FilePlus2,
   BrainCircuit,
@@ -16,6 +15,7 @@ import {
 import { cn, shortAddress } from "../../lib/utils.js";
 import { BOTCHAIN, explorerAddressUrl } from "../../lib/chain.js";
 import { useSyntura } from "../../context/SynturaStore.jsx";
+import BrandMark from "../ui/BrandMark.jsx";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -38,7 +38,7 @@ function Brand({ onClick, collapsed }) {
       )}
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition-colors group-hover:border-electric/40">
-        <Hexagon size={20} className="text-electric" strokeWidth={2.25} />
+        <BrandMark size={22} />
       </div>
       {!collapsed && (
         <div className="min-w-0">

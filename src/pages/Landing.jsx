@@ -13,12 +13,12 @@ import {
   ExternalLink,
   FilePlus2,
   Github,
-  Hexagon,
   ShieldCheck,
   Waves,
   Zap,
 } from "lucide-react";
 import { useSyntura } from "../context/SynturaStore.jsx";
+import BrandMark from "../components/ui/BrandMark.jsx";
 import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
 import { BOTCHAIN } from "../lib/chain.js";
 import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
@@ -201,9 +201,9 @@ function SentryTerminal({ onLaunch }) {
 
       <div className="mt-4 flex items-center gap-2.5">
         <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
-          <Hexagon
-            size={13}
-            className={cn("text-electric", !showVerdict && "animate-pulse")}
+          <BrandMark
+            size={15}
+            className={cn(!showVerdict && "animate-pulse")}
           />
         </span>
         <div className="min-w-0">
@@ -411,7 +411,7 @@ export default function Landing({ onLaunch }) {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
-              <Hexagon size={16} className="text-electric" strokeWidth={2.5} />
+              <BrandMark size={18} />
             </span>
             <span className="text-sm font-extrabold tracking-tight text-white">
               SYNTURA
@@ -612,7 +612,7 @@ export default function Landing({ onLaunch }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
-                <Hexagon size={16} className="text-electric" strokeWidth={2.5} />
+                <BrandMark size={18} />
               </span>
               <span className="text-sm font-extrabold tracking-tight text-white">SYNTURA</span>
             </div>
