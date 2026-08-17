@@ -1,8 +1,15 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Hexagon } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Fingerprint,
+  Hexagon,
+} from "lucide-react";
 import { BOTCHAIN, CONTRACTS } from "../lib/chain.js";
 import { cn } from "../lib/utils.js";
+import { useSyntura } from "../context/SynturaStore.jsx";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 
@@ -93,6 +100,108 @@ const addr = (a) => (
     <Mono>{a.slice(0, 10)}…{a.slice(-6)}</Mono>
   </DocLink>
 );
+
+/**
+ * Live document verifier: hash any local file in-browser and compare it to
+ * the fingerprint anchored onchain for a chosen invoice. Nothing is uploaded.
+ */
+function DocVerifier() {
+  const { invoices } = useSyntura();
+  const anchored = invoices.filter((i) => i.docHash);
+  const [selected, setSelected] = useState("");
+  const [fileHash, setFileHash] = useState(null);
+  const [fileName, setFileName] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const invoice =
+    anchored.find((i) => String(i.id) === selected) ?? anchored[0] ?? null;
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer()
+      );
+      setFileHash(
+        "0x" +
+          [...new Uint8Array(digest)]
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+      );
+      setFileName(file.name);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verdict =
+    invoice && fileHash ? (fileHash === invoice.docHash ? "match" : "mismatch") : null;
+
+  return (
+    <div className="mt-6 rounded-xl border border-white/[0.08] bg-panel/40 p-5">
+      <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        <Fingerprint size={12} className="text-electric" /> Live verifier -
+        nothing is uploaded
+      </p>
+      {anchored.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">
+          No invoices with anchored documents onchain yet - mint one with an
+          attached document and it will appear here.
+        </p>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <select
+              value={selected || String(invoice?.id ?? "")}
+              onChange={(e) => setSelected(e.target.value)}
+              className="input-glass"
+            >
+              {anchored.map((i) => (
+                <option key={i.id} value={String(i.id)}>
+                  #SYNV-{String(i.id).padStart(3, "0")} · {i.debtorName} ·{" "}
+                  {i.docName}
+                </option>
+              ))}
+            </select>
+            <input
+              type="file"
+              onChange={onFile}
+              disabled={busy}
+              className="block w-full cursor-pointer text-xs text-slate-500 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-electric/15 file:px-3.5 file:py-2 file:font-mono file:text-[10px] file:font-semibold file:uppercase file:tracking-wider file:text-electric hover:file:bg-electric/25"
+            />
+          </div>
+          {invoice && (
+            <p className="mt-3 break-all font-mono text-[10px] text-slate-500">
+              onchain: {invoice.docHash}
+            </p>
+          )}
+          {fileHash && (
+            <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+              your file ({fileName}): {fileHash}
+            </p>
+          )}
+          {verdict && (
+            <p
+              className={cn(
+                "mt-3 inline-flex rounded-full border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider",
+                verdict === "match"
+                  ? "border-emeraldx/40 bg-emeraldx/10 text-emeraldx-soft"
+                  : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+              )}
+            >
+              {verdict === "match"
+                ? "Match - this file is the anchored document"
+                : "Mismatch - this is not the anchored document"}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 /* ── Sections ──────────────────────────────────────────────────────────── */
 
@@ -394,6 +503,55 @@ const SECTIONS = [
   },
   {
     group: "Trust",
+    key: "authenticity",
+    title: "Asset authenticity & compliance",
+    body: (
+      <>
+        <P>
+          The hardest problem in RWA is proving the asset is real. Syntura's
+          position: make every claim <Strong>cryptographically anchored and
+          publicly checkable</Strong> from day one, then harden the
+          real-world bridge in layers.
+        </P>
+        <H2>Live today: document anchoring</H2>
+        <P>
+          When a supplier mints, they can attach the underlying invoice
+          document (PDF, image, export). The file is hashed{" "}
+          <Strong>in the browser</Strong> with SHA-256 - it is never uploaded
+          anywhere - and the fingerprint is committed onchain inside the mint
+          transaction's token metadata. That binds the NFT to one exact
+          real-world document:
+        </P>
+        <Bullets
+          items={[
+            <>Any counterparty holding the original file can re-hash it and prove it matches the token - byte-for-byte.</>,
+            <>A tampered or substituted document produces a different hash, and the mismatch is provable without trusting Syntura.</>,
+            <>The supplier's privacy is preserved: the chain stores a 32-byte fingerprint, not the invoice contents.</>,
+          ]}
+        />
+        <DocVerifier />
+        <H2>Also live: accountable underwriting</H2>
+        <P>
+          Authenticity is not only about the document - it is about who vouched
+          for the risk. Every underwriting verdict is produced by a
+          registry-verified sentry and committed with a deterministic audit
+          hash, so the judgment layer is as checkable as the asset layer.
+        </P>
+        <H2>The compliance roadmap</H2>
+        <KVTable
+          rows={[
+            ["Debtor attestation", "The debtor counter-signs the invoice hash (EIP-712), upgrading self-attested claims to two-party attested assets."],
+            ["Independent sentries", "Third-party underwriting agents register with their own model IDs; disagreement between sentries becomes a priced risk signal."],
+            ["Compliance module", "Allow-listed participants (KYB attestations) as an optional market tier for regulated liquidity."],
+            ["Legal assignment", "Off-chain receivable-assignment agreements referencing the onchain token ID, closing the enforceability loop."],
+            ["Default handling", "First-loss tranche and write-off mechanics for non-paying debtors."],
+          ]}
+        />
+      </>
+    ),
+  },
+  {
+    group: "Trust",
     key: "trust",
     title: "Trust model & FAQ",
     body: (
@@ -410,6 +568,7 @@ const SECTIONS = [
         <KVTable
           rows={[
             ["Who can mint an invoice?", "Any wallet. Minting alone moves no money - value only flows after a verified sentry underwrites."],
+            ["How do I know the invoice is real?", "Attach-and-anchor: the document's SHA-256 fingerprint is committed onchain at mint and anyone holding the file can verify it - see Asset authenticity & compliance."],
             ["Who is the sentry today?", "The deployer wallet, registered at deployment as syntura-sentry-v1. The registry supports adding independent sentries via governance."],
             ["Who triggers streaming?", "Anyone - it's permissionless. Underwriting is the authorization, and funds can only ever flow to the invoice's onchain supplier."],
             ["What if the debtor never pays?", "The advance stays outstanding and pool utilization reflects it. Credit-default handling (insurance tranche, write-offs) is on the roadmap."],

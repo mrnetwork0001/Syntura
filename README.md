@@ -317,7 +317,8 @@ Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395*
 - **ReentrancyGuard** on every value-moving function in `SynturaVault` (`depositLiquidity`, `streamPayout`, `withdrawYield`, settlement).
 - **Pull-over-push payments** — LP yield accrues in-contract and is withdrawn by the provider (`withdrawYield`), never force-sent, eliminating gas-griefing and reentrancy vectors on distribution.
 - **Sentry gating** — `underwriteInvoice` is callable only by an address the registry marks `isVerifiedSentry` (or the owner as a break-glass path). Unregistered agents cannot influence risk pricing.
-- **Role-scoped settlement** — only the vault (or owner) can mark an invoice settled; suppliers cannot self-settle.
+- **Role-scoped settlement** — only the vault can mark an invoice settled (there is deliberately no owner escape hatch); suppliers cannot self-settle.
+- **Asset authenticity** — at mint, the underlying invoice document can be fingerprinted client-side (SHA-256, the file never leaves the browser) with the hash anchored on-chain in the token metadata; anyone holding the original can verify it against the token, and the in-app docs include a live verifier. Roadmap hardening: debtor counter-signatures (EIP-712), independent third-party sentries, an optional KYB compliance tier, and legal receivable-assignment references.
 - **Auditability by default** — every state transition emits an indexed event, and every AI decision carries an on-chain hash commitment that anyone can recompute from the open-source model.
 - **No secrets in code** — keys, RPC endpoints, and the treasury address live exclusively in `.env` (see `.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time.
 

@@ -158,6 +158,33 @@ export default function MintInvoice() {
   const [analyzedPayload, setAnalyzedPayload] = useState(null);
   const [mintedInvoice, setMintedInvoice] = useState(null);
   const [mintError, setMintError] = useState(null);
+  const [doc, setDoc] = useState(null); // { name, size, hash } - SHA-256, hashed locally
+  const [hashing, setHashing] = useState(false);
+
+  // Fingerprint the attached invoice document in-browser. Only the hash is
+  // ever transmitted - the document itself never leaves the machine.
+  const onDocChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setDoc(null);
+      return;
+    }
+    setHashing(true);
+    try {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer()
+      );
+      const hash =
+        "0x" +
+        [...new Uint8Array(digest)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+      setDoc({ name: file.name, size: file.size, hash });
+    } finally {
+      setHashing(false);
+    }
+  };
 
   const timersRef = useRef([]);
   const dueDateTouched = useRef(false);
@@ -246,7 +273,10 @@ export default function MintInvoice() {
     setMintError(null);
     setPhase("minting");
     try {
-      const invoice = await tokenizeInvoice(analyzedPayload, result);
+      const invoice = await tokenizeInvoice(
+        { ...analyzedPayload, docHash: doc?.hash, docName: doc?.name },
+        result
+      );
       setMintedInvoice(invoice);
       setPhase("minted");
     } catch {
@@ -259,6 +289,7 @@ export default function MintInvoice() {
     clearTimers();
     dueDateTouched.current = false;
     setForm(defaultForm());
+    setDoc(null);
     setErrors({});
     setResult(null);
     setAnalyzedPayload(null);
@@ -384,6 +415,36 @@ export default function MintInvoice() {
                 onChange={(e) => onDueDateChange(e.target.value)}
                 disabled={busy}
               />
+            </Field>
+
+            <Field label="Invoice document (optional)">
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.csv,.xml,.json,.txt"
+                onChange={onDocChange}
+                disabled={busy || hashing}
+                className="block w-full cursor-pointer text-xs text-slate-500 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-electric/15 file:px-3.5 file:py-2 file:font-mono file:text-[10px] file:font-semibold file:uppercase file:tracking-wider file:text-electric hover:file:bg-electric/25"
+              />
+              {hashing && (
+                <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] text-slate-500">
+                  <Loader2 size={11} className="animate-spin" /> computing
+                  SHA-256 fingerprint…
+                </p>
+              )}
+              {doc && !hashing && (
+                <div className="mt-2 rounded-lg border border-emeraldx/25 bg-emeraldx/[0.06] px-3 py-2">
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
+                    <Fingerprint size={11} /> {doc.name}
+                  </p>
+                  <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+                    {doc.hash}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Only this fingerprint is anchored onchain at mint - the
+                    document never leaves your browser.
+                  </p>
+                </div>
+              )}
             </Field>
 
             <button
@@ -723,6 +784,18 @@ export default function MintInvoice() {
                       <span>Transaction</span>
                       <TxLink hash={mintedInvoice.txHash} />
                     </div>
+
+                    {mintedInvoice.docHash && (
+                      <div className="mt-4 rounded-xl border border-emeraldx/20 bg-emeraldx/5 px-4 py-2.5 text-left">
+                        <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
+                          <Fingerprint size={11} /> Document anchored onchain ·{" "}
+                          {mintedInvoice.docName}
+                        </p>
+                        <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+                          {mintedInvoice.docHash}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="mt-4 flex items-center gap-2 rounded-xl border border-violetx/20 bg-violetx/5 px-4 py-2.5 text-xs text-slate-300">
                       <Waves size={14} className="shrink-0 text-violetx-soft" />
