@@ -69,27 +69,40 @@ export function getReadProvider() {
   });
 }
 
-/** Connect the injected wallet (MetaMask etc.). Returns { provider, signer, address } or null. */
-export async function connectWallet() {
+/** Current chain id of the injected wallet, or null without one. */
+export async function getWalletChainId() {
   if (typeof window === "undefined" || !window.ethereum) return null;
-  const provider = new BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  const signer = await provider.getSigner();
-  return { provider, signer, address: await signer.getAddress() };
+  const hex = await window.ethereum.request({ method: "eth_chainId" });
+  return Number(hex);
 }
 
-/** Prompt the wallet to add/switch to BOTChain Mainnet. */
-export async function switchToBOTChain() {
-  if (!window.ethereum || !BOTCHAIN.chainId) return false;
+const isUserRejection = (e) =>
+  e?.code === 4001 || e?.error?.code === 4001 || e?.info?.error?.code === 4001;
+
+/**
+ * Guarantees the wallet is on BOTChain Mainnet, prompting to switch and -
+ * if the chain is missing from the wallet - to add it. Wallets report
+ * "unknown chain" in several shapes (bare 4902, nested originalError,
+ * -32603 wrappers), so ANY non-rejection switch failure falls through to
+ * wallet_addEthereumChain, which is harmless when the chain already exists.
+ * The final chain id is re-read so the result is verified, never assumed.
+ * Returns { ok, rejected }.
+ */
+export async function ensureBOTChain() {
+  if (typeof window === "undefined" || !window.ethereum || !BOTCHAIN.chainId) {
+    return { ok: false, rejected: false };
+  }
   const hexId = `0x${BOTCHAIN.chainId.toString(16)}`;
+  if ((await getWalletChainId()) === BOTCHAIN.chainId) return { ok: true, rejected: false };
+
   try {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: hexId }],
     });
-    return true;
   } catch (err) {
-    if (err?.code === 4902) {
+    if (isUserRejection(err)) return { ok: false, rejected: true };
+    try {
       await window.ethereum.request({
         method: "wallet_addEthereumChain",
         params: [
@@ -102,10 +115,38 @@ export async function switchToBOTChain() {
           },
         ],
       });
-      return true;
+    } catch (addErr) {
+      return { ok: false, rejected: isUserRejection(addErr) };
     }
-    return false;
+    // Some wallets add without switching - ask once more, then verify.
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: hexId }],
+      });
+    } catch {
+      /* verified below */
+    }
   }
+  return { ok: (await getWalletChainId()) === BOTCHAIN.chainId, rejected: false };
+}
+
+/** Back-compat alias. */
+export const switchToBOTChain = async () => (await ensureBOTChain()).ok;
+
+/**
+ * Connect the injected wallet AND land it on BOTChain Mainnet. The network
+ * is ensured BEFORE the signer is built so the signer is never bound to a
+ * stale chain. Returns { provider, signer, address, chainOk, rejected } or
+ * null when no wallet is injected.
+ */
+export async function connectWallet() {
+  if (typeof window === "undefined" || !window.ethereum) return null;
+  await window.ethereum.request({ method: "eth_requestAccounts" });
+  const { ok: chainOk, rejected } = await ensureBOTChain();
+  const provider = new BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  return { provider, signer, address: await signer.getAddress(), chainOk, rejected };
 }
 
 /** Typed contract handles bound to a signer or provider. */

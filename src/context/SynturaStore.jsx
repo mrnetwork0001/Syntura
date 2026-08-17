@@ -9,12 +9,12 @@ import React, {
 } from "react";
 import {
   connectWallet,
-  switchToBOTChain,
   getReadProvider,
   getContracts,
   isLiveChainConfigured,
   usdToWei,
   weiToUsd,
+  BOTCHAIN,
   DEPLOY_BLOCK,
 } from "../lib/chain.js";
 
@@ -92,6 +92,10 @@ export function SynturaProvider({ children }) {
   }
 
   const clearChainError = useCallback(() => setChainError(null), []);
+
+  // True while the current chainError came from a failed RPC read (vs a
+  // wallet/network warning), so refresh success only clears its own errors.
+  const readErrorRef = useRef(false);
 
   /** Full chain re-read: invoices, vault accounting, events, sentries. */
   const refresh = useCallback(
@@ -178,6 +182,8 @@ export function SynturaProvider({ children }) {
               sector: meta.sector || "Uncategorized",
               riskScore: Number(inv.riskScore),
               fraudProbability: meta.fraudProbability ?? 0,
+              docHash: meta.docHash || null,
+              docName: meta.docName || null,
               discountRateBps: Number(inv.discountRateBps),
               status: STATUS(inv, streamedWei),
               streamedPct: streamedWei > 0n || inv.isSettled ? 100 : 0,
@@ -290,8 +296,14 @@ export function SynturaProvider({ children }) {
         setInvoices(book.reverse());
         setAuditLog(entries);
         setSentries(sentryList);
-        setChainError(null);
+        // Only clear an error refresh itself raised - never wipe wallet or
+        // wrong-network warnings just because the RPC reads succeeded.
+        if (readErrorRef.current) {
+          readErrorRef.current = false;
+          setChainError(null);
+        }
       } catch (err) {
+        readErrorRef.current = true;
         setChainError(friendlyChainError(err, "Failed to read BOTChain state."));
       } finally {
         setLoading(false);
@@ -317,7 +329,13 @@ export function SynturaProvider({ children }) {
         setChainError("No wallet detected - install MetaMask (or any injected wallet) to transact.");
         return null;
       }
-      await switchToBOTChain();
+      if (!res.chainOk) {
+        setChainError(
+          res.rejected
+            ? `Network switch declined - Syntura only transacts on ${BOTCHAIN.name} (chain ${BOTCHAIN.chainId}). Approve the prompt in your wallet to continue.`
+            : `Your wallet is on the wrong network - approve the ${BOTCHAIN.name} (chain ${BOTCHAIN.chainId}) add/switch prompt to transact.`
+        );
+      }
       signerRef.current = res.signer;
       const balanceWei = await readProviderRef.current
         .getBalance(res.address)
@@ -341,6 +359,39 @@ export function SynturaProvider({ children }) {
     signerRef.current = null;
     setWallet({ address: null, connecting: false, balanceBOT: null });
   }, []);
+
+  // Track the connected address across renders for the wallet event listeners.
+  const addressRef = useRef(null);
+  useEffect(() => {
+    addressRef.current = wallet.address;
+  }, [wallet.address]);
+
+  // Follow the wallet: rebuild the session when the user switches account or
+  // lands on BOTChain, and surface a clear error when they switch away.
+  useEffect(() => {
+    const eth = typeof window !== "undefined" ? window.ethereum : null;
+    if (!eth?.on) return undefined;
+    const onChainChanged = (hexId) => {
+      if (Number(hexId) === BOTCHAIN.chainId) {
+        setChainError(null);
+        if (addressRef.current) connect();
+      } else if (addressRef.current) {
+        setChainError(
+          `Wallet moved to chain ${Number(hexId)} - switch back to ${BOTCHAIN.name} (chain ${BOTCHAIN.chainId}) to transact.`
+        );
+      }
+    };
+    const onAccountsChanged = (accounts) => {
+      if (!accounts?.length) disconnect();
+      else if (addressRef.current) connect();
+    };
+    eth.on("chainChanged", onChainChanged);
+    eth.on("accountsChanged", onAccountsChanged);
+    return () => {
+      eth.removeListener?.("chainChanged", onChainChanged);
+      eth.removeListener?.("accountsChanged", onAccountsChanged);
+    };
+  }, [connect, disconnect]);
 
   /** Signer-bound contracts; connects the wallet first if needed. */
   const requireSigner = useCallback(async () => {
@@ -372,6 +423,11 @@ export function SynturaProvider({ children }) {
         termDays: Number(payload.termDays),
         fraudProbability: underwriting.fraudProbability,
         model: "syntura-sentry-v1",
+        // SHA-256 fingerprint of the underlying invoice document, computed
+        // client-side - anchors the real-world document to the token.
+        ...(payload.docHash
+          ? { docHash: payload.docHash, docName: payload.docName }
+          : {}),
       });
 
       const mintTx = await invoiceNFT.mintInvoice(
@@ -428,6 +484,8 @@ export function SynturaProvider({ children }) {
         sector: payload.sector,
         riskScore: underwriting.riskScore,
         fraudProbability: underwriting.fraudProbability,
+        docHash: payload.docHash || null,
+        docName: payload.docName || null,
         discountRateBps: underwriting.discountRateBps,
         status: "Underwritten",
         streamedPct: 0,
