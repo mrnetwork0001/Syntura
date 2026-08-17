@@ -1,5 +1,12 @@
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useState } from "react";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "framer-motion";
 import {
   BrainCircuit,
   CheckCircle2,
@@ -18,20 +25,61 @@ import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 
-/* One real model run at module load - the hero terminal renders its actual
-   output, so the landing page is powered by the same engine as the dApp. */
-const SAMPLE_PAYLOAD = {
-  debtorName: "Dangote Industries",
-  supplierName: "Lagos Logistics Co.",
-  faceValueUSD: 125000,
-  termDays: 45,
-  dueDate: "2026-09-30",
-  sector: "Logistics & Freight",
-  debtorYearsTrading: 12,
-  priorInvoicesPaid: 9,
-  priorInvoicesDefaulted: 0,
+/* A small book of real model runs, computed once at module load - the hero
+   terminal cycles through them live, so every number on the landing page is
+   actual output of the same engine that powers the dApp. */
+const TERMINAL_BOOK = [
+  {
+    debtorName: "Dangote Industries",
+    supplierName: "Lagos Logistics Co.",
+    faceValueUSD: 125000,
+    termDays: 45,
+    dueDate: "2026-09-30",
+    sector: "Logistics & Freight",
+    debtorYearsTrading: 12,
+    priorInvoicesPaid: 9,
+    priorInvoicesDefaulted: 0,
+  },
+  {
+    debtorName: "Safaricom PLC",
+    supplierName: "Nairobi DevWorks",
+    faceValueUSD: 48500,
+    termDays: 30,
+    dueDate: "2026-09-16",
+    sector: "Software Services",
+    debtorYearsTrading: 24,
+    priorInvoicesPaid: 38,
+    priorInvoicesDefaulted: 0,
+  },
+  {
+    debtorName: "NovaTech Ventures",
+    supplierName: "Kigali Creative Studio",
+    faceValueUSD: 86200,
+    termDays: 60,
+    dueDate: "2026-10-16",
+    sector: "Media & Design",
+    debtorYearsTrading: 3,
+    priorInvoicesPaid: 2,
+    priorInvoicesDefaulted: 0,
+  },
+  {
+    debtorName: "Quick Cash Trading",
+    supplierName: "Meridian Exports",
+    faceValueUSD: 500000,
+    termDays: 118,
+    dueDate: "2026-12-13",
+    sector: "Other",
+    debtorYearsTrading: 1,
+    priorInvoicesPaid: 0,
+    priorInvoicesDefaulted: 2,
+  },
+].map((payload) => ({ payload, verdict: underwriteInvoice(payload) }));
+
+const TIER_TEXT = {
+  Low: "text-emeraldx-soft",
+  Medium: "text-amber-300",
+  High: "text-rose-400",
 };
-const SAMPLE = underwriteInvoice(SAMPLE_PAYLOAD);
 
 const reveal = {
   initial: { opacity: 0, y: 18 },
@@ -69,16 +117,53 @@ function NavLink({ href, children }) {
   );
 }
 
-/* ── Hero terminal: live sentry evaluation ─────────────────────────────── */
+/* ── Hero terminal: continuously repricing sentry ticker ──────────────── */
 
 function SentryTerminal({ onLaunch }) {
-  const score = SAMPLE.riskScore;
+  const reduced = useReducedMotion();
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState("verdict"); // "evaluating" | "verdict"
+  const [paused, setPaused] = useState(false);
+
+  const { payload, verdict } = TERMINAL_BOOK[idx];
+  const showVerdict = phase === "verdict";
+
+  // Ticker loop: ingest -> evaluate (~1.4s) -> verdict (~5.6s) -> next.
+  useEffect(() => {
+    if (reduced || paused) return undefined;
+    const t = setTimeout(
+      () => {
+        if (phase === "evaluating") setPhase("verdict");
+        else {
+          setIdx((i) => (i + 1) % TERMINAL_BOOK.length);
+          setPhase("evaluating");
+        }
+      },
+      phase === "evaluating" ? 1400 : 5600
+    );
+    return () => clearTimeout(t);
+  }, [phase, idx, paused, reduced]);
+
+  // Discount counts smoothly between verdicts.
+  const bpsMv = useMotionValue(verdict.discountRateBps);
+  useEffect(() => {
+    if (!showVerdict) return undefined;
+    const ctrl = animate(bpsMv, verdict.discountRateBps, {
+      duration: reduced ? 0 : 0.9,
+      ease: "easeOut",
+    });
+    return () => ctrl.stop();
+  }, [showVerdict, verdict.discountRateBps, bpsMv, reduced]);
+  const discountText = useTransform(bpsMv, (v) => `${(v / 100).toFixed(2)}%`);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
       className="glass min-w-0 p-5"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
       <div className="flex items-center justify-between">
         <Eyebrow>Invoice ingested</Eyebrow>
@@ -88,30 +173,45 @@ function SentryTerminal({ onLaunch }) {
         </span>
       </div>
 
-      <div className="glass-inset mt-4 p-4">
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-electric/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-electric">
-            SYNV
-          </span>
-          <span className="font-mono text-[10px] text-slate-600">just now</span>
-        </div>
-        <p className="mt-2 text-sm font-semibold text-slate-200">
-          {SAMPLE_PAYLOAD.debtorName} - {formatUSD(SAMPLE_PAYLOAD.faceValueUSD)}{" "}
-          · {SAMPLE_PAYLOAD.termDays}-day term
-        </p>
-        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-600">
-          {SAMPLE_PAYLOAD.sector}
-        </p>
+      <div className="glass-inset mt-4 overflow-hidden p-4">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-electric/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-electric">
+                SYNV
+              </span>
+              <span className="font-mono text-[10px] text-slate-600">just now</span>
+            </div>
+            <p className="mt-2 truncate text-sm font-semibold text-slate-200">
+              {payload.debtorName} - {formatUSD(payload.faceValueUSD)} ·{" "}
+              {payload.termDays}-day term
+            </p>
+            <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-slate-600">
+              {payload.sector}
+            </p>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <div className="mt-4 flex items-center gap-2.5">
         <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
-          <Hexagon size={13} className="text-electric" />
+          <Hexagon
+            size={13}
+            className={cn("text-electric", !showVerdict && "animate-pulse")}
+          />
         </span>
         <div className="min-w-0">
           <Eyebrow className="tracking-[0.18em]">Syntura sentry evaluates</Eyebrow>
           <p className="truncate text-xs text-slate-400">
-            What should this invoice cost today?
+            {showVerdict
+              ? "What should this invoice cost today?"
+              : "Running 7-factor deterministic pass…"}
           </p>
         </div>
       </div>
@@ -122,30 +222,78 @@ function SentryTerminal({ onLaunch }) {
           <span>0 - 100</span>
         </div>
         <div className="relative mt-2 h-1.5 rounded-full bg-white/[0.06]">
-          <div
+          <motion.div
             className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violetx via-electric to-emeraldx"
-            style={{ width: `${score}%` }}
+            animate={{
+              width: showVerdict ? `${verdict.riskScore}%` : "3%",
+              opacity: showVerdict ? 1 : 0.4,
+            }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
           />
-          <span
+          <motion.span
             className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-abyss bg-white"
-            style={{ left: `calc(${score}% - 7px)` }}
+            animate={{
+              left: showVerdict ? `calc(${verdict.riskScore}% - 7px)` : "0%",
+              opacity: showVerdict ? 1 : 0,
+              scale: showVerdict ? 1 : 0.5,
+            }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
           />
         </div>
-        <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-wider text-electric">
-          {score}/100 · Tier {SAMPLE.tier}
-        </p>
+        <div className="mt-2 h-4 text-center font-mono text-[10px] uppercase tracking-wider">
+          <AnimatePresence mode="wait" initial={false}>
+            {showVerdict ? (
+              <motion.p
+                key={`score-${idx}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className={TIER_TEXT[verdict.tier] || "text-electric"}
+              >
+                {verdict.riskScore}/100 · Tier {verdict.tier}
+              </motion.p>
+            ) : (
+              <motion.p
+                key="pricing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="animate-pulse text-slate-600"
+              >
+                pricing…
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-4">
         <div>
           <Eyebrow>Discount priced</Eyebrow>
-          <p className="mt-1 font-mono text-2xl font-bold text-emeraldx-soft">
-            {bpsToPercent(SAMPLE.discountRateBps)}
-          </p>
+          <motion.p
+            animate={{ opacity: showVerdict ? 1 : 0.3 }}
+            transition={{ duration: 0.3 }}
+            className="mt-1 font-mono text-2xl font-bold text-emeraldx-soft"
+          >
+            {discountText}
+          </motion.p>
         </div>
-        <span className="rounded-full border border-emeraldx/40 bg-emeraldx/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
-          Advance {Math.round(SAMPLE.advanceRatePct)}% of face
-        </span>
+        <AnimatePresence mode="wait" initial={false}>
+          {showVerdict && (
+            <motion.span
+              key={`adv-${idx}`}
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="rounded-full border border-emeraldx/40 bg-emeraldx/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft"
+            >
+              Advance {Math.round(verdict.advanceRatePct)}% of face
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-violetx/30 bg-violetx/[0.07] px-4 py-3">
