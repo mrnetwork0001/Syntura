@@ -162,6 +162,7 @@ export function SynturaProvider({ children }) {
     participants: 0,
     verdicts: 0,
     settlements: 0,
+    depositedUSD: 0,
   });
   const [wallet, setWallet] = useState({
     address: null,
@@ -377,10 +378,17 @@ export function SynturaProvider({ children }) {
           ...deposited.map((e) => e.args.provider.toLowerCase()),
           ...withdrawn.map((e) => e.args.provider.toLowerCase()),
         ]);
+        // Cumulative capital entrusted to the vault. Deposits only - counting
+        // withdrawals too would let the same dollar inflate the figure by
+        // cycling in and out.
+        let depositedUnits = 0n;
+        for (const e of deposited) depositedUnits += e.args.amount;
+
         setProtocolStats({
           participants: participants.size,
           verdicts: underwritten.length,
           settlements: settled.length,
+          depositedUSD: unitsToUsd(depositedUnits),
         });
 
         // ── Vault stats (+ per-wallet position) ──
