@@ -447,13 +447,67 @@ export function SynturaProvider({ children }) {
     [liveMode, wallet.address]
   );
 
-  // Initial load + light polling while live.
+  /**
+   * Cheap change detector. A full refresh rescans every event since deployment
+   * and re-reads every invoice, so polling THAT every few seconds would hammer
+   * the RPC. Instead this reads a handful of counters (plus the newest
+   * invoice's lifecycle flags, which is how underwriting and settlement show
+   * up) and returns a signature string. Same signature means nothing moved.
+   */
+  const readSignature = useCallback(async () => {
+    const { invoiceNFT, vault: vaultC } = getContracts(readProviderRef.current);
+    const [total, liquidity, outstanding, fees] = await Promise.all([
+      invoiceNFT.totalInvoices(),
+      vaultC.totalLiquidity(),
+      vaultC.totalOutstandingAdvances(),
+      vaultC.totalPoolFeesAccrued(),
+    ]);
+    let latest = "";
+    if (total > 0n) {
+      const inv = await invoiceNFT.getInvoice(total);
+      latest = `${inv.isUnderwritten}:${inv.isSettled}:${inv.riskScore}`;
+    }
+    return `${total}|${liquidity}|${outstanding}|${fees}|${latest}`;
+  }, []);
+
+  // Initial load, then a 4s tick that only pays for a full refresh when the
+  // chain actually changed, plus a 60s safety net in case a change slips
+  // through the signature (an older invoice settling, say).
   useEffect(() => {
     if (!liveMode) return undefined;
-    refresh();
-    const t = setInterval(refresh, 45_000);
-    return () => clearInterval(t);
-  }, [liveMode, refresh]);
+    let stop = false;
+    let busy = false;
+    let lastSig = null;
+    let sinceFull = 0;
+
+    refresh().then(() => {
+      readSignature().then((s) => { lastSig = s; }).catch(() => {});
+    });
+
+    const tick = setInterval(async () => {
+      // Skip rather than pile up when the RPC is slower than the interval.
+      if (stop || busy) return;
+      busy = true;
+      sinceFull += 4;
+      try {
+        const sig = await readSignature();
+        if (sig !== lastSig || sinceFull >= 60) {
+          lastSig = sig;
+          sinceFull = 0;
+          await refresh();
+        }
+      } catch {
+        // Transient RPC hiccup - the next tick retries.
+      } finally {
+        busy = false;
+      }
+    }, 4000);
+
+    return () => {
+      stop = true;
+      clearInterval(tick);
+    };
+  }, [liveMode, refresh, readSignature]);
 
   const connect = useCallback(async () => {
     setWallet((w) => ({ ...w, connecting: true }));
