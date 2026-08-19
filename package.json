@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "compile": "hardhat compile",
     "deploy:botchain": "hardhat run scripts/deploy_syntura.js --network botchain",
+    "simulate": "hardhat run scripts/simulate_lifecycle.js",
     "sentry:demo": "node scripts/sentry_demo.js"
   },
   "dependencies": {
