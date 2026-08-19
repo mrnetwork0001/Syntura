@@ -4,7 +4,7 @@
 
 ### Autonomous AI RWA Invoice & Real-Time Yield Streaming Protocol
 
-**Tokenize real-world invoices as NFTs · Underwrite them with a deterministic, auditable AI risk agent · Stream working capital to suppliers in real time · Settle with an automated 90 / 7 / 3 split — all on BOTChain Mainnet.**
+**Tokenize real-world invoices as NFTs · Underwrite them with a deterministic, auditable AI risk agent · Stream working capital to suppliers in real time · Settle with an automated 90 / 7 / 3 split - all on BOTChain Mainnet.**
 
 [![BOTChain Mainnet](https://img.shields.io/badge/Chain-BOTChain%20Mainnet-2563eb?style=for-the-badge&logo=ethereum&logoColor=white)](#botchain-network-configuration)
 [![Solidity 0.8.24](https://img.shields.io/badge/Solidity-0.8.24-363636?style=for-the-badge&logo=solidity&logoColor=white)](#smart-contracts)
@@ -12,7 +12,7 @@
 [![License Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-10b981?style=for-the-badge)](./LICENSE)
 [![AI x RWA](https://img.shields.io/badge/Builder%20Challenge%20%232-AI%20%C3%97%20RWA%20·%20Season%202-8b5cf6?style=for-the-badge)](#why-syntura-wins-season-2)
 
-*Built by **Ifeanyichukwu Onwo** (`mrnetwork`) for the BOTChain Builder Challenge #2 — Season 2: AI × RWA.*
+*Built by **Ifeanyichukwu Onwo** (`mrnetwork`) for the BOTChain Builder Challenge #2 - Season 2: AI × RWA.*
 
 </div>
 
@@ -39,7 +39,7 @@
 
 ## Executive Summary
 
-**$3+ trillion of the world's SME invoices sit unpaid at any moment.** Suppliers who have already delivered goods wait 30–90 days for payment, while banks decline the majority of small-business factoring requests — slowest and most opaque in exactly the emerging markets that need working capital most.
+**$3+ trillion of the world's SME invoices sit unpaid at any moment.** Suppliers who have already delivered goods wait 30–90 days for payment, while banks decline the majority of small-business factoring requests - slowest and most opaque in exactly the emerging markets that need working capital most.
 
 **Syntura** turns an unpaid invoice into a productive on-chain asset in four autonomous stages:
 
@@ -47,27 +47,27 @@
 |-------|-------------|-------|
 | **1 · Tokenize** | A supplier mints their invoice as an ERC-721 RWA NFT (`SYNV`) with face value, debtor, and due date on-chain | `SynturaInvoiceNFT.sol` |
 | **2 · AI Underwrite** | The **AI Risk Sentry** - a deterministic, explainable scoring agent running as an autonomous service under its own registry-verified key, not the supplier's wallet - computes a 0–100 risk score, fraud probability, discount rate, and advance rate, then **commits a deterministic 256-bit audit hash of its full reasoning onchain** (FNV-1a/xorshift construction; keccak256 planned) | `service/sentry.js` + `src/agent/aiSentryAgent.js` + `SynturaSentryRegistry.sol` |
-| **3 · Stream** | The liquidity vault streams the advance (typically ~85% of face value) to the supplier in real time — no 60-day wait | `SynturaVault.sol` |
+| **3 · Stream** | The liquidity vault streams the advance (typically ~85% of face value) to the supplier in real time - no 60-day wait | `SynturaVault.sol` |
 | **4 · Settle** | When the debtor pays, settlement executes an atomic **90% supplier / 7% liquidity pool / 3% treasury** split, and LPs withdraw yield pro-rata | `SynturaVault.sol` |
 
-The result: suppliers get same-day liquidity, liquidity providers earn yield from real settlement cash flows, and every AI decision that moved money is **verifiable on the BOTChain explorer** — not a black box.
+The result: suppliers get same-day liquidity, liquidity providers earn yield from real settlement cash flows, and every AI decision that moved money is **verifiable on the BOTChain explorer** - not a black box.
 
 ---
 
 ## Why Syntura Wins Season 2
 
-Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent" — the AI agent and the real-world asset are structurally fused at the contract level.
+Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent" - the AI agent and the real-world asset are structurally fused at the contract level.
 
-### Track 1 alignment — Autonomous AI agents on-chain
+### Track 1 alignment - Autonomous AI agents on-chain
 
 - **A real agent, not a chatbot wrapper.** `src/agent/aiSentryAgent.js` is a pure-ESM, zero-dependency underwriting model that runs identically in the browser and in Node (`npm run sentry:demo`). It scores debtor credit, term risk, sector risk, size bands, due-date proximity, and fraud signals.
 - **Actually autonomous, not a button.** `service/sentry.js` is a standalone Node watcher that holds its own registered key, polls BOTChain for `InvoiceMinted`, reruns the identical model, and submits `underwriteInvoice` + `commitRiskScore` with no human in the loop. The supplier signs one transaction; the agent signs its own. See [Autonomous AI Sentry Service](#autonomous-ai-sentry-service).
-- **On-chain agent identity.** `SynturaSentryRegistry.sol` registers sentries by address + model ID (`syntura-sentry-v1`). Only **verified** sentries can underwrite invoices — the NFT contract gates `underwriteInvoice` through the registry.
+- **On-chain agent identity.** `SynturaSentryRegistry.sol` registers sentries by address + model ID (`syntura-sentry-v1`). Only **verified** sentries can underwrite invoices - the NFT contract gates `underwriteInvoice` through the registry.
 - **Accountable AI.** Every underwriting decision produces a deterministic `auditHash` (a 32-byte commitment over the payload + scores) that is committed on-chain via `commitRiskScore`. Anyone can re-run the open-source model on the same inputs and verify the hash. Determinism is a hard design rule: identical payloads always produce identical results (hash-derived jitter, no `Math.random`).
 
-### Track 2 alignment — Real-world assets with real cash flows
+### Track 2 alignment - Real-world assets with real cash flows
 
-- **A genuinely productive RWA.** Invoices are self-liquidating assets with a defined maturity — the canonical entry point for on-chain RWA credit.
+- **A genuinely productive RWA.** Invoices are self-liquidating assets with a defined maturity - the canonical entry point for on-chain RWA credit.
 - **Full lifecycle on-chain.** Mint → underwrite → stream → settle, each emitting indexed events (`InvoiceMinted`, `InvoiceUnderwritten`, `PayoutStreamed`, `InvoiceSettled`) that the in-app **On-Chain Audit Log** renders as an explorer-linked timeline.
 - **Real yield mechanics.** LP returns come from settlement fees on real invoice cash flows (the 7% pool cut), not token emissions.
 
@@ -116,10 +116,10 @@ flowchart TB
 
 **The four-stage pipeline, end to end:**
 
-1. **Tokenize** — the supplier mints the invoice as an ERC-721 (`mintInvoice`), putting face value, debtor, and due date on-chain. That single transaction is the supplier's entire involvement.
-2. **AI Underwrite** — the autonomous sentry service picks the new invoice up from the `InvoiceMinted` event, scores it, and writes `riskScore`, `discountRateBps`, and the reasoning `auditHash` to both the NFT and the registry, signed by its own registry-verified key.
-3. **Streaming Liquidity** — LP capital in the vault streams the advance to the supplier the moment underwriting clears (`streamPayout`).
-4. **90/7/3 Settlement** — debtor repayment triggers the atomic split; the NFT is marked settled and pool yield becomes claimable via pull-payment `withdrawYield`.
+1. **Tokenize** - the supplier mints the invoice as an ERC-721 (`mintInvoice`), putting face value, debtor, and due date on-chain. That single transaction is the supplier's entire involvement.
+2. **AI Underwrite** - the autonomous sentry service picks the new invoice up from the `InvoiceMinted` event, scores it, and writes `riskScore`, `discountRateBps`, and the reasoning `auditHash` to both the NFT and the registry, signed by its own registry-verified key.
+3. **Streaming Liquidity** - LP capital in the vault streams the advance to the supplier the moment underwriting clears (`streamPayout`).
+4. **90/7/3 Settlement** - debtor repayment triggers the atomic split; the NFT is marked settled and pool yield becomes claimable via pull-payment `withdrawYield`.
 
 ---
 
@@ -175,9 +175,9 @@ Syntura/
 
 ## Smart Contracts
 
-All contracts are **Solidity `^0.8.24`**, built on **OpenZeppelin v5**, fully NatSpec-documented, SPDX `Apache-2.0`. The frontend consumes them through human-readable ethers v6 ABIs in [`src/lib/chain.js`](./src/lib/chain.js) — a hard interface contract between the dApp and the chain.
+All contracts are **Solidity `^0.8.24`**, built on **OpenZeppelin v5**, fully NatSpec-documented, SPDX `Apache-2.0`. The frontend consumes them through human-readable ethers v6 ABIs in [`src/lib/chain.js`](./src/lib/chain.js) - a hard interface contract between the dApp and the chain.
 
-### `SynturaInvoiceNFT.sol` — ERC-721 "Syntura RWA Invoice" (`SYNV`)
+### `SynturaInvoiceNFT.sol` - ERC-721 "Syntura RWA Invoice" (`SYNV`)
 
 Each token wraps an `Invoice` struct: `{ invoiceId, supplier, debtorName, faceValueUSD, dueDate, riskScore, discountRateBps, isUnderwritten, isSettled }`. `faceValueUSD` is an 18-decimal USD wad (`$1 = 1e18`); so are the amounts in this contract's events. USDT base units live one layer down, in the vault.
 
@@ -191,7 +191,7 @@ Each token wraps an `Invoice` struct: `{ invoiceId, supplier, debtorName, faceVa
 
 **Events:** `InvoiceMinted(invoiceId, supplier, faceValueUSD, dueDate)` · `InvoiceUnderwritten(invoiceId, riskScore, discountRateBps, auditHash)` · `InvoiceSettled(invoiceId, supplierPayout, poolFee, treasuryFee)`
 
-### `SynturaVault.sol` — Liquidity, Streaming Escrow & Settlement
+### `SynturaVault.sol` - Liquidity, Streaming Escrow & Settlement
 
 Holds LP capital, streams advances against underwritten invoices, and executes the **90 / 7 / 3** settlement split (constants `9000 / 700 / 300` BPS). The vault is **denominated in bridged USDT** (6 decimals): it holds no native balance, and every amount below is USDT base units.
 
@@ -207,7 +207,7 @@ Holds LP capital, streams advances against underwritten invoices, and executes t
 
 **Events:** `LiquidityDeposited(provider, amount)` · `PayoutStreamed(invoiceId, supplier, amount)` · `YieldWithdrawn(provider, amount)` · `SettlementExecuted(invoiceId, supplierPayout, poolFee, treasuryFee)` - all amounts in USDT base units
 
-### `SynturaSentryRegistry.sol` — AI Agent Identity & Commitments
+### `SynturaSentryRegistry.sol` - AI Agent Identity & Commitments
 
 The accountability layer: which model said what, about which asset, provably.
 
@@ -238,12 +238,12 @@ underwriteInvoice({ debtorName, supplierName, faceValueUSD, termDays,
 
 ### The factor model
 
-Each signal lands in the `factors` array with an explicit weight (0–1), a 0–100 sub-score, an impact direction, and a plain-English note — nothing is hidden:
+Each signal lands in the `factors` array with an explicit weight (0–1), a 0–100 sub-score, an impact direction, and a plain-English note - nothing is hidden:
 
 | Factor | What it measures |
 |--------|-----------------|
 | **Debtor credit profile** | Name-keyword heuristics + trading history (`debtorYearsTrading`) proxying counterparty strength |
-| **Payment history** | `priorInvoicesPaid` vs `priorInvoicesDefaulted` — the strongest empirical repayment signal |
+| **Payment history** | `priorInvoicesPaid` vs `priorInvoicesDefaulted` - the strongest empirical repayment signal |
 | **Invoice size band** | Very small and very large tickets carry asymmetric risk; mid-band invoices score best |
 | **Payment-term risk curve** | Longer `termDays` = more exposure time; risk rises non-linearly with tenor |
 | **Sector risk table** | Per-sector base rates across the 10 supported sectors (logistics, software, agri/FMCG, healthcare, …) |
@@ -254,9 +254,9 @@ The **discount rate** is then derived from composite risk plus the time value of
 
 ### Determinism + on-chain accountability
 
-- **Deterministic by construction:** identical payloads always produce byte-identical results. Any "jitter" is derived from hashing the payload itself — there is no `Math.random` anywhere in the model.
+- **Deterministic by construction:** identical payloads always produce byte-identical results. Any "jitter" is derived from hashing the payload itself - there is no `Math.random` anywhere in the model.
 - **`auditHash`** is a 64-hex-char commitment computed over the payload and every score the model produced. It is committed on-chain via `SynturaSentryRegistry.commitRiskScore` and stored on the invoice NFT.
-- **Verify it yourself:** the model is open source — re-run `underwriteInvoice` on the same inputs and recompute the hash. If it matches the on-chain commitment, the AI's decision is proven untampered. This is AI you can audit, not AI you must trust.
+- **Verify it yourself:** the model is open source - re-run `underwriteInvoice` on the same inputs and recompute the hash. If it matches the on-chain commitment, the AI's decision is proven untampered. This is AI you can audit, not AI you must trust.
 
 ---
 
@@ -348,9 +348,9 @@ Dark terminal-style dApp - React 18, Vite 5, Tailwind, framer-motion, lucide ico
 
 | # | Screen | What it shows |
 |---|--------|---------------|
-| 1 | **Dashboard** | Hero + live protocol stats (invoices tokenized, streaming liquidity, AI audits passed, average APY), the 90/7/3 fee-split visual, and the full invoice book with per-row lifecycle actions — **Start Stream** on underwritten invoices, **Settle** on streaming ones, with live progress bars and tx links |
+| 1 | **Dashboard** | Hero + live protocol stats (invoices tokenized, streaming liquidity, AI audits passed, average APY), the 90/7/3 fee-split visual, and the full invoice book with per-row lifecycle actions - **Start Stream** on underwritten invoices, **Settle** on streaming ones, with live progress bars and tx links |
 | 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → optional client-side document anchoring → **a single mint transaction**, then a live "the autonomous sentry is underwriting onchain" wait that resolves into the onchain verdict, with a chip confirming it matches the locally predicted score byte for byte |
-| 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them — watch the risk gauge, discount rate, and factor weights respond in real time. Below, the Sentry Network panel reads the live `SynturaSentryRegistry` — registered model ID, agent address, and on-chain commitment count |
+| 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them - watch the risk gauge, discount rate, and factor weights respond in real time. Below, the Sentry Network panel reads the live `SynturaSentryRegistry` - registered model ID, agent address, and on-chain commitment count |
 | 4 | **Liquidity Vaults** | Vault stats, USDT deposit with quick-pick chips ($1/$5/$25), your wallet's USDT balance and the two-step approve-then-deposit progress, projected-yield math, your position + pull-payment yield withdrawal, pool utilization, and a 3-step "how streaming yield works" explainer |
 | 5 | **On-Chain Audit Log** | An execution explorer: a filterable, color-coded timeline of every protocol event (MINT / AI_UNDERWRITE / STREAM / SETTLEMENT / DEPOSIT / WITHDRAW), newest first, each entry linking to the BOTChain explorer |
 
@@ -388,7 +388,7 @@ npm run sentry:demo
 cd service && npm ci && cp .env.example .env && npm start
 ```
 
-Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Awaiting deployment** to **Live · BOTChain** — from that point every button is a mainnet transaction.
+Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Awaiting deployment** to **Live · BOTChain** - from that point every button is a mainnet transaction.
 
 Mint from **any** wallet: minting is one transaction and requires no special rights. Underwriting is not part of that flow - it is done by the sentry service from step 7, running under its own registry-verified key, so keep that process alive (or run `node sentry.js --once`) or freshly minted invoices simply stay queued until it next runs. See [Autonomous AI Sentry Service](#autonomous-ai-sentry-service).
 
@@ -401,23 +401,23 @@ Every settled invoice executes one atomic split, enforced by BPS constants in `S
 | Recipient | Share | BPS | Rationale |
 |-----------|-------|-----|-----------|
 |  **Supplier** | **90%** | `9000` | The business that did the work keeps the overwhelming majority |
-|  **Liquidity Pool** | **7%** | `700` | Real-world yield for LPs — claimable pro-rata via `withdrawYield()` |
+|  **Liquidity Pool** | **7%** | `700` | Real-world yield for LPs - claimable pro-rata via `withdrawYield()` |
 |  **Protocol Treasury** | **3%** | `300` | Sustains the protocol; address set at deploy (`TREASURY_ADDRESS`) |
 
-Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395** · treasury **$1,455**, exactly as emitted in `SettlementExecuted` and rendered in the in-app audit log.
+Example - a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395** · treasury **$1,455**, exactly as emitted in `SettlementExecuted` and rendered in the in-app audit log.
 
 ---
 
 ## Security Model
 
 - **ReentrancyGuard** on every value-moving function in `SynturaVault` (`depositLiquidity`, `streamPayout`, `withdrawYield`, settlement).
-- **Pull-over-push payments** — LP yield accrues in-contract and is withdrawn by the provider (`withdrawYield`), never force-sent, eliminating gas-griefing and reentrancy vectors on distribution.
-- **Sentry gating** — `underwriteInvoice` is callable only by an address the registry marks `isVerifiedSentry` (or the owner as a break-glass path). Unregistered agents cannot influence risk pricing.
-- **Role separation** — the wallet that mints an invoice is never the wallet that scores it. Underwriting runs in the [autonomous sentry service](#autonomous-ai-sentry-service) under a dedicated key that exists only in `service/.env` on the service host: it is gitignored, never bundled into the frontend, and never reaches a browser. Suppliers cannot underwrite their own paper, and the dApp never asks a user for a permission they should not have.
-- **Role-scoped settlement** — only the vault can mark an invoice settled (there is deliberately no owner escape hatch); suppliers cannot self-settle.
-- **Asset authenticity** — at mint, the underlying invoice document can be fingerprinted client-side (SHA-256, the file never leaves the browser) with the hash anchored on-chain in the token metadata; anyone holding the original can verify it against the token, and the in-app docs include a live verifier. Roadmap hardening: debtor counter-signatures (EIP-712), independent third-party sentries, an optional KYB compliance tier, and legal receivable-assignment references.
-- **Auditability by default** — every state transition emits an indexed event, and every AI decision carries an on-chain hash commitment that anyone can recompute from the open-source model.
-- **No secrets in code** — keys, RPC endpoints, and the treasury address live exclusively in `.env` files (see `.env.example` and `service/.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time, and `SENTRY_PRIVATE_KEY` only by the sentry process. Both `.env` files and the service's `state.json` are gitignored, and no key is ever logged - the service prints its address and balance, never its key.
+- **Pull-over-push payments** - LP yield accrues in-contract and is withdrawn by the provider (`withdrawYield`), never force-sent, eliminating gas-griefing and reentrancy vectors on distribution.
+- **Sentry gating** - `underwriteInvoice` is callable only by an address the registry marks `isVerifiedSentry` (or the owner as a break-glass path). Unregistered agents cannot influence risk pricing.
+- **Role separation** - the wallet that mints an invoice is never the wallet that scores it. Underwriting runs in the [autonomous sentry service](#autonomous-ai-sentry-service) under a dedicated key that exists only in `service/.env` on the service host: it is gitignored, never bundled into the frontend, and never reaches a browser. Suppliers cannot underwrite their own paper, and the dApp never asks a user for a permission they should not have.
+- **Role-scoped settlement** - only the vault can mark an invoice settled (there is deliberately no owner escape hatch); suppliers cannot self-settle.
+- **Asset authenticity** - at mint, the underlying invoice document can be fingerprinted client-side (SHA-256, the file never leaves the browser) with the hash anchored on-chain in the token metadata; anyone holding the original can verify it against the token, and the in-app docs include a live verifier. Roadmap hardening: debtor counter-signatures (EIP-712), independent third-party sentries, an optional KYB compliance tier, and legal receivable-assignment references.
+- **Auditability by default** - every state transition emits an indexed event, and every AI decision carries an on-chain hash commitment that anyone can recompute from the open-source model.
+- **No secrets in code** - keys, RPC endpoints, and the treasury address live exclusively in `.env` files (see `.env.example` and `service/.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time, and `SENTRY_PRIVATE_KEY` only by the sentry process. Both `.env` files and the service's `state.json` are gitignored, and no key is ever logged - the service prints its address and balance, never its key.
 
 >  Hackathon-stage software: the contracts follow established OpenZeppelin patterns but have **not** undergone an external audit. Do not deploy with meaningful value before one.
 
@@ -425,9 +425,9 @@ Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395*
 
 ## BOTChain Network Configuration
 
-### Deployed contracts — live on BOT Chain Mainnet, source-verified
+### Deployed contracts - live on BOT Chain Mainnet, source-verified
 
-All three contracts are **source-verified on the explorer** — each address below shows readable Solidity, the ABI, and a Read/Write console.
+All three contracts are **source-verified on the explorer** - each address below shows readable Solidity, the ABI, and a Read/Write console.
 
 | Contract | Address |
 |----------|---------|
@@ -436,7 +436,7 @@ All three contracts are **source-verified on the explorer** — each address bel
 | `SynturaSentryRegistry` | [`0x19B0c0BB8A654b950739B84776A5951BA4ABf676`](https://scan.botchain.ai/address/0x19B0c0BB8A654b950739B84776A5951BA4ABf676) |
 | Registered AI sentry (`syntura-sentry-v1`) | [`0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635`](https://scan.botchain.ai/address/0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635) |
 
-The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified — `underwriteInvoice` is gated through `isVerifiedSentry`. The [autonomous sentry service](#autonomous-ai-sentry-service) runs under its own dedicated key, registered the same way with `registerSentry(<service address>, "syntura-sentry-v1")`, so the deployer key never has to be online to underwrite.
+The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified - `underwriteInvoice` is gated through `isVerifiedSentry`. The [autonomous sentry service](#autonomous-ai-sentry-service) runs under its own dedicated key, registered the same way with `registerSentry(<service address>, "syntura-sentry-v1")`, so the deployer key never has to be online to underwrite.
 
 All chain parameters are **environment-driven**, with the verified BOT Chain Mainnet values as fallback defaults:
 
@@ -456,30 +456,30 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 | `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` | Frontend | Enables live mode when set |
 | `VITE_USDT_ADDRESS` | Frontend | Settlement token; defaults to the bridged USDT above and is also required for live mode |
 
-> **Note on network values:** chain ID 677 and the RPC/explorer endpoints above match the public BOT Chain Mainnet registry ([chainlist.org/chain/677](https://chainlist.org/chain/677)) and were verified live via `eth_chainId` against `https://rpc.botchain.ai`. If the BOTChain team publishes different official endpoints for the challenge, point `.env` at those — no code changes required. Until contract addresses are configured, the dApp transparently labels itself **"Awaiting deployment"** in the topbar and shows an empty state rather than fake data.
+> **Note on network values:** chain ID 677 and the RPC/explorer endpoints above match the public BOT Chain Mainnet registry ([chainlist.org/chain/677](https://chainlist.org/chain/677)) and were verified live via `eth_chainId` against `https://rpc.botchain.ai`. If the BOTChain team publishes different official endpoints for the challenge, point `.env` at those - no code changes required. Until contract addresses are configured, the dApp transparently labels itself **"Awaiting deployment"** in the topbar and shows an empty state rather than fake data.
 
 ---
 
 ## Roadmap
 
 - **Multi-stablecoin settlement** - the vault settles in bridged USDT today; per-invoice choice of settlement token (and a bridge/swap path into it) is next.
-- **Continuous per-block streaming** — upgrade `streamPayout` from advance-tranche streaming to true per-second vesting curves.
-- **Multi-sentry consensus** — N-of-M verified sentries must agree (registry already supports multiple agents) before large invoices clear underwriting.
-- **ZK-verified underwriting** — replace the hash commitment with a zero-knowledge proof that the published model produced the score, without revealing debtor data.
-- **Secondary market** — order book for trading underwritten `SYNV` invoice NFTs before maturity.
-- **Real-world ingestion** — e-invoicing API integrations (PEPPOL, local African e-invoice mandates) so invoices tokenize directly from accounting systems.
-- **Debtor identity attestations** — on-chain credit registries and DID attestations feeding the Sentry's debtor-profile factor.
-- **Treasury governance** — hand the 3% treasury stream to a token-governed DAO.
+- **Continuous per-block streaming** - upgrade `streamPayout` from advance-tranche streaming to true per-second vesting curves.
+- **Multi-sentry consensus** - N-of-M verified sentries must agree (registry already supports multiple agents) before large invoices clear underwriting.
+- **ZK-verified underwriting** - replace the hash commitment with a zero-knowledge proof that the published model produced the score, without revealing debtor data.
+- **Secondary market** - order book for trading underwritten `SYNV` invoice NFTs before maturity.
+- **Real-world ingestion** - e-invoicing API integrations (PEPPOL, local African e-invoice mandates) so invoices tokenize directly from accounting systems.
+- **Debtor identity attestations** - on-chain credit registries and DID attestations feeding the Sentry's debtor-profile factor.
+- **Treasury governance** - hand the 3% treasury stream to a token-governed DAO.
 
 ---
 
 ## License
 
-**Apache License 2.0** — see [LICENSE](./LICENSE).
+**Apache License 2.0** - see [LICENSE](./LICENSE).
 
 <div align="center">
 
-*Syntura — turning the world's unpaid invoices into transparent, AI-underwritten, yield-streaming assets on BOTChain.*
+*Syntura - turning the world's unpaid invoices into transparent, AI-underwritten, yield-streaming assets on BOTChain.*
 
 ** Built for BOTChain Builder Challenge #2 · Season 2: AI × RWA · by Ifeanyichukwu Onwo (mrnetwork)**
 
