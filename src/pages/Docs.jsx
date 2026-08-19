@@ -95,6 +95,28 @@ function Mono({ children }) {
   return <span className="font-mono text-[13px]">{children}</span>;
 }
 
+/** Copy-pasteable shell block in the app's terminal-panel language. */
+function Shell({ lines }) {
+  return (
+    <div className="mt-6 overflow-x-auto rounded-xl border border-white/[0.08] bg-panel/40 p-5">
+      <pre className="font-mono text-[12.5px] leading-relaxed text-slate-300">
+        {lines.map((line, i) => (
+          <span key={i} className="block whitespace-pre">
+            {line.startsWith("#") ? (
+              <span className="text-slate-600">{line}</span>
+            ) : (
+              <>
+                <span className="select-none text-electric">$ </span>
+                {line}
+              </>
+            )}
+          </span>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
 const addr = (a) => (
   <DocLink href={`${BOTCHAIN.explorerUrl}/address/${a}`}>
     <Mono>{a.slice(0, 10)}…{a.slice(-6)}</Mono>
@@ -269,7 +291,7 @@ const SECTIONS = [
       <>
         <P>
           Every invoice moves through four onchain stages. Each stage is a
-          single wallet-signed transaction, and each emits an indexed event
+          single signed transaction, and each emits an indexed event
           that the in-app audit log renders as an explorer-linked timeline.
         </P>
         <KVTable
@@ -280,7 +302,7 @@ const SECTIONS = [
             ],
             [
               <Mono>2 · underwriteInvoice()</Mono>,
-              <>A registry-verified AI sentry writes the risk score (0-100), discount rate (bps) and the deterministic audit hash of its full reasoning. The same hash is anchored in the registry via <Code>commitRiskScore()</Code>.</>,
+              <>A registry-verified AI sentry - the autonomous service, not the supplier's wallet - writes the risk score (0-100), discount rate (bps) and the deterministic audit hash of its full reasoning. The same hash is anchored in the registry via <Code>commitRiskScore()</Code>.</>,
             ],
             [
               <Mono>3 · streamPayout()</Mono>,
@@ -467,6 +489,136 @@ const SECTIONS = [
     ),
   },
   {
+    group: "The AI sentry",
+    key: "sentry-service",
+    title: "The autonomous sentry service",
+    body: (
+      <>
+        <P>
+          The sentry is not a button inside the dApp. Underwriting is performed
+          by an independent Node service (<Code>service/sentry.js</Code>) that
+          holds its own registry-verified key, watches BOTChain for freshly
+          minted invoices, reruns the same open-source model, and submits the
+          verdict onchain by itself. <Strong>Supplier and sentry are separate
+          actors</Strong> - which is the only reason the risk score is worth
+          anything.
+        </P>
+        <H2>Separation of roles</H2>
+        <KVTable
+          rows={[
+            [
+              "Supplier · browser wallet",
+              <>Signs exactly <Strong>one</Strong> transaction: <Code>mintInvoice()</Code>. The dApp then polls <Code>getInvoice(id)</Code> and renders the verdict when it lands. It never asks for a permission the supplier does not have.</>,
+            ],
+            [
+              "Sentry · service host",
+              <>Holds a dedicated key that the owner registered with <Code>registerSentry(address, "syntura-sentry-v1")</Code>. Rebuilds the payload from chain state, scores it, and sends <Code>underwriteInvoice()</Code> then <Code>commitRiskScore()</Code>.</>,
+            ],
+            [
+              "Registry · onchain gate",
+              <>Both writes are gated on <Code>isVerifiedSentry(msg.sender)</Code>, so the service can only speak for itself, and only while it stays registered.</>,
+            ],
+          ]}
+        />
+        <P>
+          <Strong>The browser never holds the sentry key.</Strong> It lives only
+          in <Code>service/.env</Code> on the machine running the service -
+          gitignored, never bundled, never shipped to a visitor. Before this
+          split, a supplier who minted got an invoice stranded at "Awaiting AI"
+          forever, because their own wallet was not a verified sentry. Now the
+          mint is a single approval and the underwriting arrives on its own,
+          usually within a tick or two.
+        </P>
+        <P>
+          Because both sides run the identical model, the mint screen can
+          compare the verdict it reads back from the chain against the one it
+          predicted locally before minting. When the risk score, discount rate
+          and audit hash match exactly - they always should - the UI says so.
+          That is determinism demonstrated by two independent processes rather
+          than asserted in a doc.
+        </P>
+        <H2>What one tick does</H2>
+        <Bullets
+          items={[
+            <>Reads <Code>totalInvoices()</Code>, then scans <Code>InvoiceMinted</Code> logs from the last processed block in bounded chunks. On a cold start - or whenever the state file is missing - it sweeps every id from <Mono>1</Mono> to <Mono>totalInvoices</Mono> instead, so invoices minted while the service was down are still collected.</>,
+            <>Rebuilds the model payload from the invoice struct plus <Code>tokenURI(id)</Code> metadata: debtor, face value at the <Code>1e12</Code> scale, due date, sector, supplier name and term days, deriving term days from the mint block timestamp when the metadata is thin.</>,
+            <>Runs the same <Code>underwriteInvoice()</Code> model the browser runs, then re-reads <Code>getInvoice(id)</Code> as a race guard immediately before sending.</>,
+            <>Sends <Code>underwriteInvoice()</Code> and <Code>commitRiskScore()</Code> sequentially - nonce order matters - awaiting confirmations between them, and logs one structured line per invoice carrying both tx hashes.</>,
+            <>Persists <Code>{"{ lastProcessedBlock, pending, done }"}</Code> atomically, so a restart resumes exactly where it stopped.</>,
+          ]}
+        />
+        <P>
+          <Strong>Nothing gets stranded.</Strong> Each invoice is handled inside
+          its own try/catch: a failure records the id in <Code>pending</Code>
+          {" "}for retry on later ticks with a bounded attempt count, and never
+          stops the loop. Provider errors back off exponentially (capped around
+          a minute) and reset on the next success. A revert that means "already
+          underwritten" is treated as success, not as an error to retry forever.
+          On <Code>SIGINT</Code>/<Code>SIGTERM</Code> the service finishes the
+          in-flight invoice, persists state, and exits cleanly.
+        </P>
+        <H2>Configuration</H2>
+        <P>
+          Everything is environment-driven from <Code>service/.env</Code>;{" "}
+          <Code>service/.env.example</Code> ships with the live mainnet
+          addresses and deploy block prefilled and a key placeholder.
+        </P>
+        <KVTable
+          rows={[
+            [<Mono>BOTCHAIN_RPC_URL</Mono>, <>Read/write RPC endpoint - defaults to <Mono>{BOTCHAIN.rpcUrl}</Mono>.</>],
+            [<Mono>SENTRY_PRIVATE_KEY</Mono>, "The service's own registered sentry key. Provisioned separately from the deployer key and never committed."],
+            [<Mono>INVOICE_NFT_ADDRESS</Mono>, "The SYNV contract the service reads invoices from and underwrites on."],
+            [<Mono>SENTRY_REGISTRY_ADDRESS</Mono>, "Where the audit hash is committed, and the contract that verifies the service's own address at startup."],
+            [<Mono>START_BLOCK</Mono>, <>First block for the log scan - the deploy block <Mono>19906390</Mono> keeps cold starts fast.</>],
+            [<Mono>POLL_MS</Mono>, <>Tick interval in milliseconds. Default <Mono>6000</Mono>.</>],
+            [<Mono>MAX_BLOCK_SPAN</Mono>, <>Log-scan chunk size, so a long catch-up never asks the RPC for too wide a range. Default <Mono>2000</Mono>.</>],
+            [<Mono>CONFIRMATIONS</Mono>, <>Confirmations awaited per transaction before the next one is sent. Default <Mono>1</Mono>.</>],
+            [<Mono>STATE_FILE</Mono>, <>Path to the JSON cursor written atomically each tick. Default <Mono>./state.json</Mono>.</>],
+          ]}
+        />
+        <H2>Running it</H2>
+        <Shell
+          lines={[
+            "cd service && npm ci",
+            "# one pass over every outstanding invoice, then exit 0",
+            "node sentry.js --once",
+            "# or watch continuously",
+            "npm start",
+          ]}
+        />
+        <P>
+          <Code>--once</Code> processes a single pass and exits <Mono>0</Mono>,
+          which makes the same binary usable as a cron job, a smoke test after
+          deployment, or a manual catch-up run. For continuous operation the
+          repo ships <Code>service/syntura-sentry.service</Code>, a hardened
+          systemd unit (<Code>Restart=always</Code>,{" "}
+          <Code>NoNewPrivileges</Code>, <Code>ProtectSystem=strict</Code>) that
+          reads the same <Code>.env</Code> and logs to the journal -{" "}
+          <Code>journalctl -fu syntura-sentry</Code>. The full VPS runbook,
+          including key rotation, is in <Code>service/README.md</Code>.
+        </P>
+        <H2>Run your own sentry</H2>
+        <P>
+          Nothing about the service is privileged. It is ~400 lines of ESM
+          against two public contracts, using the exact model in this repo.
+          Generate a key, have the registry owner register the address with your
+          own model ID, point the <Code>.env</Code> at the same contracts, and
+          your agent underwrites alongside the reference one. Several sentries
+          can watch the same chain safely: the invoice's underwritten flag makes
+          the write single-shot, so the first verdict to land wins and the
+          others skip it. Turning disagreement between independent models into a
+          priced risk signal is the next step - see the compliance roadmap.
+        </P>
+        <P>
+          Operators who do hold a verified sentry wallet in the browser keep a
+          manual path: the mint screen and the dashboard both expose an
+          underwrite action on pending invoices, signed by the connected wallet.
+          It is a fallback for when the service is down, not the normal flow.
+        </P>
+      </>
+    ),
+  },
+  {
     group: "Operate",
     key: "deploy",
     title: "Self-hosting & deployment",
@@ -569,7 +721,7 @@ const SECTIONS = [
           rows={[
             ["Who can mint an invoice?", "Any wallet. Minting alone moves no money - value only flows after a verified sentry underwrites."],
             ["How do I know the invoice is real?", "Attach-and-anchor: the document's SHA-256 fingerprint is committed onchain at mint and anyone holding the file can verify it - see Asset authenticity & compliance."],
-            ["Who is the sentry today?", "The deployer wallet, registered at deployment as syntura-sentry-v1. The registry supports adding independent sentries via governance."],
+            ["Who is the sentry today?", "An autonomous service running syntura-sentry-v1 under its own registered key - it watches for new invoices and underwrites them without any user involvement. See The autonomous sentry service; the registry supports adding independent sentries via governance."],
             ["Who triggers streaming?", "Anyone - it's permissionless. Underwriting is the authorization, and funds can only ever flow to the invoice's onchain supplier."],
             ["What if the debtor never pays?", "The advance stays outstanding and pool utilization reflects it. Credit-default handling (insurance tranche, write-offs) is on the roadmap."],
             ["Is the AI's output binding?", "Yes - the discount and risk score written onchain are what the vault streams against, and the audit hash makes the reasoning permanently checkable."],

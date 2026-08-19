@@ -26,13 +26,14 @@
 4. [Repository Structure](#repository-structure)
 5. [Smart Contracts](#smart-contracts)
 6. [The AI Risk Sentry](#the-ai-risk-sentry)
-7. [Frontend Feature Tour](#frontend-feature-tour)
-8. [Quickstart](#quickstart)
-9. [Settlement Fee Split](#settlement-fee-split)
-10. [Security Model](#security-model)
-11. [BOTChain Network Configuration](#botchain-network-configuration)
-12. [Roadmap](#roadmap)
-13. [License](#license)
+7. [Autonomous AI Sentry Service](#autonomous-ai-sentry-service)
+8. [Frontend Feature Tour](#frontend-feature-tour)
+9. [Quickstart](#quickstart)
+10. [Settlement Fee Split](#settlement-fee-split)
+11. [Security Model](#security-model)
+12. [BOTChain Network Configuration](#botchain-network-configuration)
+13. [Roadmap](#roadmap)
+14. [License](#license)
 
 ---
 
@@ -45,7 +46,7 @@
 | Stage | What Happens | Where |
 |-------|-------------|-------|
 | **1 · Tokenize** | A supplier mints their invoice as an ERC-721 RWA NFT (`SYNV`) with face value, debtor, and due date on-chain | `SynturaInvoiceNFT.sol` |
-| **2 · AI Underwrite** | The **AI Risk Sentry** — a deterministic, explainable scoring agent — computes a 0–100 risk score, fraud probability, discount rate, and advance rate, then **commits a deterministic 256-bit audit hash of its full reasoning on-chain** (FNV-1a/xorshift construction; keccak256 planned) | `src/agent/aiSentryAgent.js` + `SynturaSentryRegistry.sol` |
+| **2 · AI Underwrite** | The **AI Risk Sentry** - a deterministic, explainable scoring agent running as an autonomous service under its own registry-verified key, not the supplier's wallet - computes a 0–100 risk score, fraud probability, discount rate, and advance rate, then **commits a deterministic 256-bit audit hash of its full reasoning onchain** (FNV-1a/xorshift construction; keccak256 planned) | `service/sentry.js` + `src/agent/aiSentryAgent.js` + `SynturaSentryRegistry.sol` |
 | **3 · Stream** | The liquidity vault streams the advance (typically ~85% of face value) to the supplier in real time — no 60-day wait | `SynturaVault.sol` |
 | **4 · Settle** | When the debtor pays, settlement executes an atomic **90% supplier / 7% liquidity pool / 3% treasury** split, and LPs withdraw yield pro-rata | `SynturaVault.sol` |
 
@@ -60,6 +61,7 @@ Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent
 ### Track 1 alignment — Autonomous AI agents on-chain
 
 - **A real agent, not a chatbot wrapper.** `src/agent/aiSentryAgent.js` is a pure-ESM, zero-dependency underwriting model that runs identically in the browser and in Node (`npm run sentry:demo`). It scores debtor credit, term risk, sector risk, size bands, due-date proximity, and fraud signals.
+- **Actually autonomous, not a button.** `service/sentry.js` is a standalone Node watcher that holds its own registered key, polls BOTChain for `InvoiceMinted`, reruns the identical model, and submits `underwriteInvoice` + `commitRiskScore` with no human in the loop. The supplier signs one transaction; the agent signs its own. See [Autonomous AI Sentry Service](#autonomous-ai-sentry-service).
 - **On-chain agent identity.** `SynturaSentryRegistry.sol` registers sentries by address + model ID (`syntura-sentry-v1`). Only **verified** sentries can underwrite invoices — the NFT contract gates `underwriteInvoice` through the registry.
 - **Accountable AI.** Every underwriting decision produces a deterministic `auditHash` (a 32-byte commitment over the payload + scores) that is committed on-chain via `commitRiskScore`. Anyone can re-run the open-source model on the same inputs and verify the hash. Determinism is a hard design rule: identical payloads always produce identical results (hash-derived jitter, no `Math.random`).
 
@@ -83,7 +85,7 @@ Season 2's brief is **AI × RWA**. Syntura is not "AI-adjacent" or "RWA-adjacent
 flowchart TB
     subgraph OFFCHAIN["Off-Chain · AI Layer"]
         SUPPLIER(["🏭 Supplier<br/>(unpaid invoice)"])
-        SENTRY["🤖 AI Risk Sentry<br/>src/agent/aiSentryAgent.js<br/>deterministic multi-factor model<br/>risk · fraud · discount · advance rate"]
+        SENTRY["🤖 Autonomous AI Sentry Service<br/>service/sentry.js + src/agent/aiSentryAgent.js<br/>own registry-verified key · watches InvoiceMinted<br/>risk · fraud · discount · advance rate"]
     end
 
     subgraph BOTCHAIN["⛓ BOTChain Mainnet"]
@@ -98,8 +100,8 @@ flowchart TB
         TREASURY(["🏛 Protocol Treasury"])
     end
 
-    SUPPLIER -- "① mintInvoice()" --> NFT
-    NFT -- "invoice payload" --> SENTRY
+    SUPPLIER -- "① mintInvoice() · the supplier's only signature" --> NFT
+    NFT -. "① InvoiceMinted event · polled" .-> SENTRY
     SENTRY -- "② underwriteInvoice(score, rate, auditHash)" --> NFT
     SENTRY -- "② commitRiskScore(auditHash)" --> REG
     REG -. "isVerifiedSentry() gate" .-> NFT
@@ -114,8 +116,8 @@ flowchart TB
 
 **The four-stage pipeline, end to end:**
 
-1. **Tokenize** — the supplier mints the invoice as an ERC-721 (`mintInvoice`), putting face value, debtor, and due date on-chain.
-2. **AI Underwrite** — the verified Sentry scores the invoice and writes `riskScore`, `discountRateBps`, and the reasoning `auditHash` to both the NFT and the registry.
+1. **Tokenize** — the supplier mints the invoice as an ERC-721 (`mintInvoice`), putting face value, debtor, and due date on-chain. That single transaction is the supplier's entire involvement.
+2. **AI Underwrite** — the autonomous sentry service picks the new invoice up from the `InvoiceMinted` event, scores it, and writes `riskScore`, `discountRateBps`, and the reasoning `auditHash` to both the NFT and the registry, signed by its own registry-verified key.
 3. **Streaming Liquidity** — LP capital in the vault streams the advance to the supplier the moment underwriting clears (`streamPayout`).
 4. **90/7/3 Settlement** — debtor repayment triggers the atomic split; the NFT is marked settled and pool yield becomes claimable via pull-payment `withdrawYield`.
 
@@ -132,6 +134,12 @@ Syntura/
 ├── scripts/
 │   ├── deploy_syntura.js            # Full BOTChain deploy + wiring + env output
 │   └── sentry_demo.js               # Run the AI Sentry standalone in Node
+├── service/                         # Autonomous sentry service - its own npm package
+│   ├── sentry.js                    # Watcher: scans InvoiceMinted, scores, writes verdicts
+│   ├── package.json                 # ESM · ethers v6 + dotenv only
+│   ├── .env.example                 # RPC · sentry key placeholder · addresses · tuning
+│   ├── syntura-sentry.service       # Hardened systemd unit template
+│   └── README.md                    # VPS deployment runbook + key rotation
 ├── src/
 │   ├── agent/
 │   │   └── aiSentryAgent.js         # Deterministic AI underwriting model (browser + Node)
@@ -251,6 +259,74 @@ The **discount rate** is then derived from composite risk plus the time value of
 
 ---
 
+## Autonomous AI Sentry Service
+
+The model above is the brain. `service/` is the agent that acts on it: a standalone Node package that holds its own registry-verified key, watches BOTChain for newly minted invoices, reruns the identical model, and writes the verdict onchain by itself.
+
+### Why it exists: supplier and sentry are different actors
+
+`underwriteInvoice` and `commitRiskScore` are gated on `isVerifiedSentry(msg.sender)`. A supplier's wallet is not a verified sentry and never should be - an asset owner who can score their own asset is not underwriting, it is self-attestation. So the roles are split:
+
+| Actor | Holds | Signs |
+|-------|-------|-------|
+| **Supplier** (browser wallet) | nothing privileged | exactly one transaction: `mintInvoice()` |
+| **Sentry service** (own host) | a dedicated key registered as `syntura-sentry-v1` | `underwriteInvoice()` then `commitRiskScore()`, autonomously |
+| **Registry** (onchain) | the verified-sentry set | nothing - it is the gate both writes pass through |
+
+**The browser never holds the sentry key.** It exists only in `service/.env` on the machine running the service - gitignored, never bundled into the frontend, never sent to a visitor. The frontend now mints with a **single transaction** and then simply polls `getInvoice(id)` until the sentry's verdict lands, showing an honest "the autonomous sentry is underwriting onchain" state while it waits.
+
+Because both sides run the same open-source model, the mint screen compares the verdict it reads back from the chain against the one it computed locally before minting. Matching risk score, discount rate and audit hash is determinism demonstrated by two independent processes, not asserted in a doc.
+
+### What the watcher does
+
+- **Startup:** resolves the wallet, logs only its address, chain ID and BOT balance, checks `isVerifiedSentry(self)`, and warns loudly with the exact `registerSentry(...)` call to run if it is not registered - without exiting, since it may be registered while running.
+- **Each tick:** reads `totalInvoices()`, then scans `InvoiceMinted` logs from the last processed block in bounded chunks. On a cold start, or when the state file is missing, it sweeps every id instead - so **invoices minted while the service was down are still picked up**.
+- **Payload reconstruction:** debtor, face value (at the `1e12` protocol scale), and due date come from the invoice struct; sector, supplier name, term days and optional debtor history come from `tokenURI(id)`. Malformed or absent metadata falls back to sane defaults, and term days are derived from the mint block timestamp when missing.
+- **Race guard:** `getInvoice(id)` is re-read immediately before sending, and the two writes go out **sequentially** (nonce order matters), awaiting confirmations between them.
+- **Logging:** one structured line per invoice - id, debtor, face value, risk, tier, discount, and both tx hashes.
+- **State:** `{ lastProcessedBlock, pending, done }` written atomically each tick, so a restart resumes exactly where it stopped.
+
+**Nothing gets stranded.** Every invoice is handled in its own try/catch: a failure lands the id in `pending` for bounded retry on later ticks and never stops the loop. Provider errors back off exponentially and reset on success, an "already underwritten" revert counts as success, and `SIGINT`/`SIGTERM` finishes the in-flight invoice, persists state, and exits 0.
+
+### Running the service
+
+```bash
+cd service
+npm ci
+cp .env.example .env        # fill in SENTRY_PRIVATE_KEY - the service's own key, not the deployer's
+
+node sentry.js --once       # one pass over every outstanding invoice, then exit 0
+npm start                   # or watch continuously
+```
+
+`--once` makes the same binary usable as a cron job, a post-deploy smoke test, or a manual catch-up run.
+
+| Variable | Purpose |
+|----------|---------|
+| `BOTCHAIN_RPC_URL` | Read/write RPC endpoint (`https://rpc.botchain.ai`) |
+| `SENTRY_PRIVATE_KEY` | The service's own registered sentry key - provisioned separately, never committed |
+| `INVOICE_NFT_ADDRESS` / `SENTRY_REGISTRY_ADDRESS` | The two contracts it reads from and writes to |
+| `START_BLOCK` | First block for the log scan (deploy block `19906390`) |
+| `POLL_MS` / `MAX_BLOCK_SPAN` / `CONFIRMATIONS` | Tick interval, log-scan chunk size, confirmations per tx |
+| `STATE_FILE` | Path to the atomically written JSON cursor |
+
+### Production
+
+`service/syntura-sentry.service` is a hardened systemd unit template (`Restart=always`, `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` with a narrow `ReadWritePaths` for the state file) that reads the same `.env` and logs to the journal:
+
+```bash
+sudo systemctl enable --now syntura-sentry
+journalctl -fu syntura-sentry
+```
+
+The full VPS runbook - clone, install, smoke test, systemd install, key rotation, and how the registry owner registers a sentry address - lives in [`service/README.md`](./service/README.md).
+
+### Run your own sentry
+
+Nothing about the service is privileged: it is plain ESM against two public contracts, using the exact model in this repo. Generate a key, have the registry owner register the address with your own model ID, point the `.env` at the same contracts, and your agent underwrites alongside the reference one. Several sentries can watch the same chain safely - the invoice's `isUnderwritten` flag makes the write single-shot, so the first verdict to land wins and the others skip it.
+
+---
+
 ## Frontend Feature Tour
 
 Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, lucide icons. Fully responsive, animated page transitions, every transaction deep-linked to the BOTChain explorer.
@@ -258,12 +334,12 @@ Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, l
 | # | Screen | What it shows |
 |---|--------|---------------|
 | 1 | **Dashboard** | Hero + live protocol stats (invoices tokenized, streaming liquidity, AI audits passed, average APY), the 90/7/3 fee-split visual, and the full invoice book with per-row lifecycle actions — **Start Stream** on underwritten invoices, **Settle** on streaming ones, with live progress bars and tx links |
-| 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → mint + on-chain underwrite + registry commitment, with the real tx link |
+| 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → optional client-side document anchoring → **a single mint transaction**, then a live "the autonomous sentry is underwriting onchain" wait that resolves into the onchain verdict, with a chip confirming it matches the locally predicted score byte for byte |
 | 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them — watch the risk gauge, discount rate, and factor weights respond in real time. Below, the Sentry Network panel reads the live `SynturaSentryRegistry` — registered model ID, agent address, and on-chain commitment count |
 | 4 | **Liquidity Vaults** | Vault stats, one-click deposit with quick-pick chips ($1k/$10k/$50k) and projected-yield math, your position + pull-payment yield withdrawal, pool utilization, and a 3-step "how streaming yield works" explainer |
 | 5 | **On-Chain Audit Log** | An execution explorer: a filterable, color-coded timeline of every protocol event (MINT / AI_UNDERWRITE / STREAM / SETTLEMENT / DEPOSIT / WITHDRAW), newest first, each entry linking to the BOTChain explorer |
 
-**Nothing is mocked:** the store reads invoices from `getInvoice`, vault accounting from the vault's view functions, and the audit timeline from indexed contract events; mint/underwrite/stream/settle/deposit/withdraw are wallet-signed transactions. Before contract addresses land in `.env`, the app shows an explicitly empty **Awaiting deployment** state instead of fake data.
+**Nothing is mocked:** the store reads invoices from `getInvoice`, vault accounting from the vault's view functions, and the audit timeline from indexed contract events; mint/stream/settle/deposit/withdraw are wallet-signed transactions, and underwriting is signed by the [autonomous sentry service](#autonomous-ai-sentry-service) rather than by the user. Pending invoices show as queued for the sentry; if the connected wallet *is* a registry-verified sentry, the dashboard and mint screen also expose a manual underwrite action as an operator fallback. Before contract addresses land in `.env`, the app shows an explicitly empty **Awaiting deployment** state instead of fake data.
 
 **Value scale:** invoices are USD-denominated; settlement legs move native BOT at a documented protocol scale of **1 USD = 10¹² wei**, so a $125,000 invoice settles with 0.125 BOT of real value — every flow is a genuine mainnet transaction at sane cost.
 
@@ -292,9 +368,14 @@ npm run deploy:botchain     # deploys Registry → InvoiceNFT → Vault, wires t
 
 # 6 · Run the AI Sentry standalone (Node, no browser)
 npm run sentry:demo
+
+# 7 · Start the autonomous sentry service (separate package, own key)
+cd service && npm ci && cp .env.example .env && npm start
 ```
 
-Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Awaiting deployment** to **Live · BOTChain** — from that point every button is a mainnet transaction. Mint and underwrite from the deployer wallet (it is the registered sentry).
+Paste the `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` lines printed by the deploy script into `.env`, restart `npm run dev`, and the topbar flips from **Awaiting deployment** to **Live · BOTChain** — from that point every button is a mainnet transaction.
+
+Mint from **any** wallet: minting is one transaction and requires no special rights. Underwriting is not part of that flow - it is done by the sentry service from step 7, running under its own registry-verified key, so keep that process alive (or run `node sentry.js --once`) or freshly minted invoices simply stay queued until it next runs. See [Autonomous AI Sentry Service](#autonomous-ai-sentry-service).
 
 ---
 
@@ -317,10 +398,11 @@ Example — a $48,500 invoice settles as: supplier **$43,650** · pool **$3,395*
 - **ReentrancyGuard** on every value-moving function in `SynturaVault` (`depositLiquidity`, `streamPayout`, `withdrawYield`, settlement).
 - **Pull-over-push payments** — LP yield accrues in-contract and is withdrawn by the provider (`withdrawYield`), never force-sent, eliminating gas-griefing and reentrancy vectors on distribution.
 - **Sentry gating** — `underwriteInvoice` is callable only by an address the registry marks `isVerifiedSentry` (or the owner as a break-glass path). Unregistered agents cannot influence risk pricing.
+- **Role separation** — the wallet that mints an invoice is never the wallet that scores it. Underwriting runs in the [autonomous sentry service](#autonomous-ai-sentry-service) under a dedicated key that exists only in `service/.env` on the service host: it is gitignored, never bundled into the frontend, and never reaches a browser. Suppliers cannot underwrite their own paper, and the dApp never asks a user for a permission they should not have.
 - **Role-scoped settlement** — only the vault can mark an invoice settled (there is deliberately no owner escape hatch); suppliers cannot self-settle.
 - **Asset authenticity** — at mint, the underlying invoice document can be fingerprinted client-side (SHA-256, the file never leaves the browser) with the hash anchored on-chain in the token metadata; anyone holding the original can verify it against the token, and the in-app docs include a live verifier. Roadmap hardening: debtor counter-signatures (EIP-712), independent third-party sentries, an optional KYB compliance tier, and legal receivable-assignment references.
 - **Auditability by default** — every state transition emits an indexed event, and every AI decision carries an on-chain hash commitment that anyone can recompute from the open-source model.
-- **No secrets in code** — keys, RPC endpoints, and the treasury address live exclusively in `.env` (see `.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time.
+- **No secrets in code** — keys, RPC endpoints, and the treasury address live exclusively in `.env` files (see `.env.example` and `service/.env.example`); `PRIVATE_KEY` is only ever read by Hardhat at deploy time, and `SENTRY_PRIVATE_KEY` only by the sentry process. Both `.env` files and the service's `state.json` are gitignored, and no key is ever logged - the service prints its address and balance, never its key.
 
 >  Hackathon-stage software: the contracts follow established OpenZeppelin patterns but have **not** undergone an external audit. Do not deploy with meaningful value before one.
 
@@ -339,7 +421,7 @@ All three contracts are **source-verified on the explorer** — each address bel
 | `SynturaSentryRegistry` | [`0x19B0c0BB8A654b950739B84776A5951BA4ABf676`](https://scan.botchain.ai/address/0x19B0c0BB8A654b950739B84776A5951BA4ABf676) |
 | Registered AI sentry (`syntura-sentry-v1`) | [`0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635`](https://scan.botchain.ai/address/0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635) |
 
-The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified — `underwriteInvoice` is gated through `isVerifiedSentry`.
+The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified — `underwriteInvoice` is gated through `isVerifiedSentry`. The [autonomous sentry service](#autonomous-ai-sentry-service) runs under its own dedicated key, registered the same way with `registerSentry(<service address>, "syntura-sentry-v1")`, so the deployer key never has to be online to underwrite.
 
 All chain parameters are **environment-driven**, with the verified BOT Chain Mainnet values as fallback defaults:
 
