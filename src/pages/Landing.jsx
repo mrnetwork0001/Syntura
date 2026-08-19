@@ -24,6 +24,16 @@ import { BOTCHAIN } from "../lib/chain.js";
 import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
+const X_URL = "https://x.com/SynturaHQ";
+
+/** X wordmark glyph - lucide ships a close icon, not the brand mark. */
+function XLogo({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
 
 /* A small book of real model runs, computed once at module load - the hero
    terminal cycles through them live, so every number on the landing page is
@@ -610,6 +620,28 @@ export default function Landing({ onLaunch }) {
               AI-underwritten RWA invoices on BOTChain. Tokenize, price, stream,
               settle - with every decision auditable.
             </p>
+            <div className="mt-5 flex items-center gap-2.5">
+              <a
+                href={X_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Syntura on X"
+                title="Syntura on X"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-400 transition-colors hover:border-electric/40 hover:text-white"
+              >
+                <XLogo size={13} />
+              </a>
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Syntura on GitHub"
+                title="Syntura on GitHub"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-400 transition-colors hover:border-electric/40 hover:text-white"
+              >
+                <Github size={15} />
+              </a>
+            </div>
           </div>
           {[
             {
