@@ -669,17 +669,6 @@ export default function Landing({ onLaunch }) {
             </div>
           ))}
         </div>
-        <div className="border-t border-white/[0.06]">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-            <p className="font-mono text-[10px] leading-relaxed text-slate-600">
-              Every payload is unsigned until your wallet approves it. Built by
-              Ifeanyichukwu Onwo (mrnetwork) · Apache-2.0.
-            </p>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-slate-600">
-              BOTChain · Chain {BOTCHAIN.chainId}
-            </p>
-          </div>
-        </div>
       </footer>
     </div>
   );
