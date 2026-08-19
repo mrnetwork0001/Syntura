@@ -405,13 +405,13 @@ export default function Landing({ onLaunch }) {
   const { invoices, vault, protocolStats } = useSyntura();
 
   const heroStats = [
-    { label: "Invoices tokenized", value: String(invoices.length) },
+    { label: "Invoices", value: String(invoices.length) },
     {
-      label: "Liquidity in USDT",
+      label: "Liquidity",
       value: formatUSD(vault.totalLiquidityUSD, { compact: true }),
     },
-    { label: "AI verdicts onchain", value: String(protocolStats.verdicts) },
-    { label: "Wallets", value: String(protocolStats.participants) },
+    { label: "AI verdicts", value: String(protocolStats.verdicts) },
+    { label: "Active users", value: String(protocolStats.participants) },
   ];
 
   return (
