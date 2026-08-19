@@ -105,9 +105,9 @@ flowchart TB
     SENTRY -- "② underwriteInvoice(score, rate, auditHash)" --> NFT
     SENTRY -- "② commitRiskScore(auditHash)" --> REG
     REG -. "isVerifiedSentry() gate" .-> NFT
-    LP -- "depositLiquidity()" --> VAULT
+    LP -- "approve → depositLiquidity(amount) · USDT" --> VAULT
     VAULT -- "③ streamPayout() · real-time advance" --> SUPPLIER
-    DEBTOR -- "④ pays invoice at maturity" --> VAULT
+    DEBTOR -- "④ approve → settleInvoice() · face value in USDT" --> VAULT
     VAULT -- "④ settle → settleInvoice()" --> NFT
     VAULT -- "90% supplier payout" --> SUPPLIER
     VAULT -- "7% pool yield → withdrawYield()" --> LP
@@ -179,7 +179,7 @@ All contracts are **Solidity `^0.8.24`**, built on **OpenZeppelin v5**, fully Na
 
 ### `SynturaInvoiceNFT.sol` — ERC-721 "Syntura RWA Invoice" (`SYNV`)
 
-Each token wraps an `Invoice` struct: `{ invoiceId, supplier, debtorName, faceValueUSD, dueDate, riskScore, discountRateBps, isUnderwritten, isSettled }`.
+Each token wraps an `Invoice` struct: `{ invoiceId, supplier, debtorName, faceValueUSD, dueDate, riskScore, discountRateBps, isUnderwritten, isSettled }`. `faceValueUSD` is an 18-decimal USD wad (`$1 = 1e18`); so are the amounts in this contract's events. USDT base units live one layer down, in the vault.
 
 | Function | Access | Purpose |
 |----------|--------|---------|
@@ -193,18 +193,19 @@ Each token wraps an `Invoice` struct: `{ invoiceId, supplier, debtorName, faceVa
 
 ### `SynturaVault.sol` — Liquidity, Streaming Escrow & Settlement
 
-Holds LP capital, streams advances against underwritten invoices, and executes the **90 / 7 / 3** settlement split (constants `9000 / 700 / 300` BPS).
+Holds LP capital, streams advances against underwritten invoices, and executes the **90 / 7 / 3** settlement split (constants `9000 / 700 / 300` BPS). The vault is **denominated in bridged USDT** (6 decimals): it holds no native balance, and every amount below is USDT base units.
 
 | Function | Access | Purpose |
 |----------|--------|---------|
-| `depositLiquidity()` `payable` | Anyone | Provide streaming liquidity to the pool |
+| `depositLiquidity(uint256 amount)` | Anyone | Provide streaming liquidity to the pool - pulls `amount` USDT via `transferFrom`, so **the caller must `approve` the vault first** |
 | `streamPayout(uint256 invoiceId)` | Guarded (underwritten invoices only) | Streams the advance to the invoice's supplier; per-invoice streamed amounts tracked |
 | `withdrawYield()` | LP (pull payment) | Claims the caller's pro-rata share of accumulated pool fees |
 | `totalLiquidity() → uint256` | View | Total pooled capital |
 | `yieldOf(address) → uint256` | View | Claimable yield for a provider |
-| Settlement entry point | Debtor repayment path | Pays the 90/7/3 split and calls `invoiceNFT.settleInvoice` atomically |
+| `faceValueUnits(uint256 invoiceId) → uint256` | View | The authoritative settlement amount: face value converted once to USDT base units |
+| `settleInvoice(uint256 invoiceId)` | Debtor repayment path | Pulls exactly `faceValueUnits(invoiceId)` in USDT (**an ERC-20 approval is required first**), pays the 90/7/3 split and calls `invoiceNFT.settleInvoice` atomically |
 
-**Events:** `LiquidityDeposited(provider, amount)` · `PayoutStreamed(invoiceId, supplier, amount)` · `YieldWithdrawn(provider, amount)`
+**Events:** `LiquidityDeposited(provider, amount)` · `PayoutStreamed(invoiceId, supplier, amount)` · `YieldWithdrawn(provider, amount)` · `SettlementExecuted(invoiceId, supplierPayout, poolFee, treasuryFee)` - all amounts in USDT base units
 
 ### `SynturaSentryRegistry.sol` — AI Agent Identity & Commitments
 
@@ -281,7 +282,7 @@ Because both sides run the same open-source model, the mint screen compares the 
 
 - **Startup:** resolves the wallet, logs only its address, chain ID and BOT balance, checks `isVerifiedSentry(self)`, and warns loudly with the exact `registerSentry(...)` call to run if it is not registered - without exiting, since it may be registered while running.
 - **Each tick:** reads `totalInvoices()`, then scans `InvoiceMinted` logs from the last processed block in bounded chunks. On a cold start, or when the state file is missing, it sweeps every id instead - so **invoices minted while the service was down are still picked up**.
-- **Payload reconstruction:** debtor, face value (at the `1e12` protocol scale), and due date come from the invoice struct; sector, supplier name, term days and optional debtor history come from `tokenURI(id)`. Malformed or absent metadata falls back to sane defaults, and term days are derived from the mint block timestamp when missing.
+- **Payload reconstruction:** debtor, face value (an 18-decimal USD wad), and due date come from the invoice struct; sector, supplier name, term days and optional debtor history come from `tokenURI(id)`. Malformed or absent metadata falls back to sane defaults, and term days are derived from the mint block timestamp when missing.
 - **Race guard:** `getInvoice(id)` is re-read immediately before sending, and the two writes go out **sequentially** (nonce order matters), awaiting confirmations between them.
 - **Logging:** one structured line per invoice - id, debtor, face value, risk, tier, discount, and both tx hashes.
 - **State:** `{ lastProcessedBlock, pending, done }` written atomically each tick, so a restart resumes exactly where it stopped.
@@ -336,12 +337,12 @@ Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, l
 | 1 | **Dashboard** | Hero + live protocol stats (invoices tokenized, streaming liquidity, AI audits passed, average APY), the 90/7/3 fee-split visual, and the full invoice book with per-row lifecycle actions — **Start Stream** on underwritten invoices, **Settle** on streaming ones, with live progress bars and tx links |
 | 2 | **Mint RWA Invoice** | The tokenization flow: validated invoice form → animated "AI Sentry analyzing…" phase → complete underwriting report (risk gauge, fraud probability, discount, advance rate, factor breakdown, terminal-style rationale, audit hash) → optional client-side document anchoring → **a single mint transaction**, then a live "the autonomous sentry is underwriting onchain" wait that resolves into the onchain verdict, with a chip confirming it matches the locally predicted score byte for byte |
 | 3 | **AI Risk Underwriter** | The Sentry showcase: an interactive sandbox where sliders and inputs **re-underwrite instantly** as you move them — watch the risk gauge, discount rate, and factor weights respond in real time. Below, the Sentry Network panel reads the live `SynturaSentryRegistry` — registered model ID, agent address, and on-chain commitment count |
-| 4 | **Liquidity Vaults** | Vault stats, one-click deposit with quick-pick chips ($1k/$10k/$50k) and projected-yield math, your position + pull-payment yield withdrawal, pool utilization, and a 3-step "how streaming yield works" explainer |
+| 4 | **Liquidity Vaults** | Vault stats, USDT deposit with quick-pick chips ($1/$5/$25), your wallet's USDT balance and the two-step approve-then-deposit progress, projected-yield math, your position + pull-payment yield withdrawal, pool utilization, and a 3-step "how streaming yield works" explainer |
 | 5 | **On-Chain Audit Log** | An execution explorer: a filterable, color-coded timeline of every protocol event (MINT / AI_UNDERWRITE / STREAM / SETTLEMENT / DEPOSIT / WITHDRAW), newest first, each entry linking to the BOTChain explorer |
 
 **Nothing is mocked:** the store reads invoices from `getInvoice`, vault accounting from the vault's view functions, and the audit timeline from indexed contract events; mint/stream/settle/deposit/withdraw are wallet-signed transactions, and underwriting is signed by the [autonomous sentry service](#autonomous-ai-sentry-service) rather than by the user. Pending invoices show as queued for the sentry; if the connected wallet *is* a registry-verified sentry, the dashboard and mint screen also expose a manual underwrite action as an operator fallback. Before contract addresses land in `.env`, the app shows an explicitly empty **Awaiting deployment** state instead of fake data.
 
-**Value scale:** invoices are USD-denominated; settlement legs move native BOT at a documented protocol scale of **1 USD = 10¹² wei**, so a $125,000 invoice settles with 0.125 BOT of real value — every flow is a genuine mainnet transaction at sane cost.
+**Units and settlement:** invoices are USD-denominated - the NFT stores face value as an 18-decimal USD wad (`$1 = 1e18`), a unit of account rather than a token balance. Settlement moves the real [bridged USDT on BOTChain](https://scan.botchain.ai/address/0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c) (`0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c`, 6 decimals) 1:1 against that face value, so a **$5 invoice settles as exactly 5.000000 USDT** and every dollar shown in the app is a literal dollar of stablecoin - the old `1 USD = 10¹² wei` demo peg is gone. The vault converts wad to token units internally by dividing by `USD_WAD_PER_TOKEN_UNIT` (`1e12`), and `faceValueUnits(id)` is the authoritative settlement amount that the dApp and the sentry service read instead of repeating the conversion. Native **BOT is still the gas asset**, so a wallet needs both, and because USDT is an ERC-20, deposits and settlements are two-step flows: `approve(vault, amount)` for the exact amount needed, then the vault call.
 
 ---
 
@@ -431,13 +432,15 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 | Chain ID | **677** (`0x2a5`) |
 | RPC | `https://rpc.botchain.ai` |
 | Explorer | [`https://scan.botchain.ai`](https://scan.botchain.ai) |
-| Currency | BOT (18 decimals) |
+| Gas currency | BOT (18 decimals) |
+| Settlement token | Bridged USDT (6 decimals) - [`0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c`](https://scan.botchain.ai/address/0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c) |
 
 | Variable | Used by | Purpose |
 |----------|---------|---------|
 | `BOTCHAIN_RPC_URL` / `BOTCHAIN_CHAIN_ID` | Hardhat (`hardhat.config.cjs`) | Deploy target |
 | `VITE_BOTCHAIN_RPC_URL` / `VITE_BOTCHAIN_CHAIN_ID` / `VITE_BOTCHAIN_EXPLORER_URL` | Frontend (`src/lib/chain.js`) | Providers, wallet add/switch-chain, explorer deep-links |
 | `VITE_INVOICE_NFT_ADDRESS` / `VITE_VAULT_ADDRESS` / `VITE_SENTRY_REGISTRY_ADDRESS` | Frontend | Enables live mode when set |
+| `VITE_USDT_ADDRESS` | Frontend | Settlement token; defaults to the bridged USDT above and is also required for live mode |
 
 > **Note on network values:** chain ID 677 and the RPC/explorer endpoints above match the public BOT Chain Mainnet registry ([chainlist.org/chain/677](https://chainlist.org/chain/677)) and were verified live via `eth_chainId` against `https://rpc.botchain.ai`. If the BOTChain team publishes different official endpoints for the challenge, point `.env` at those — no code changes required. Until contract addresses are configured, the dApp transparently labels itself **"Awaiting deployment"** in the topbar and shows an empty state rather than fake data.
 
@@ -445,7 +448,7 @@ All chain parameters are **environment-driven**, with the verified BOT Chain Mai
 
 ## Roadmap
 
-- **Stablecoin settlement rails** — denominate streams and settlements in on-chain stablecoins alongside native BOT.
+- **Multi-stablecoin settlement** - the vault settles in bridged USDT today; per-invoice choice of settlement token (and a bridge/swap path into it) is next.
 - **Continuous per-block streaming** — upgrade `streamPayout` from advance-tranche streaming to true per-second vesting curves.
 - **Multi-sentry consensus** — N-of-M verified sentries must agree (registry already supports multiple agents) before large invoices clear underwriting.
 - **ZK-verified underwriting** — replace the hash commitment with a zero-knowledge proof that the published model produced the score, without revealing debtor data.

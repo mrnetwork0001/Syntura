@@ -310,13 +310,13 @@ const SECTIONS = [
             ],
             [
               <Mono>4 · settleInvoice()</Mono>,
-              <>The debtor repays exact face value into the vault. The waterfall splits it 90% supplier / 7% pool / 3% treasury; the supplier leg is netted against the streamed advance, which returns pool principal.</>,
+              <>The debtor approves the vault for <Code>faceValueUnits(id)</Code> USDT, then the vault pulls exactly that and splits it 90% supplier / 7% pool / 3% treasury; the supplier leg is netted against the streamed advance, which returns pool principal.</>,
             ],
           ]}
         />
         <P>
-          Liquidity providers sit underneath the whole cycle: they deposit
-          native BOT into the vault, earn the 7% pool fee from every
+          Liquidity providers sit underneath the whole cycle: they approve and
+          deposit USDT into the vault, earn the 7% pool fee from every
           settlement pro-rata, and withdraw yield (or idle principal) at any
           time via pull-payments.
         </P>
@@ -338,7 +338,7 @@ const SECTIONS = [
           rows={[
             [<Mono>supplier</Mono>, "The wallet that minted - receives streams and the settlement residual."],
             [<Mono>debtorName</Mono>, "The paying counterparty, stored as a public string."],
-            [<Mono>faceValueUSD</Mono>, <>Face value at the protocol scale (<Code>1 USD = 1e12 wei</Code> - see Value scale).</>],
+            [<Mono>faceValueUSD</Mono>, <>Face value as an 18-decimal USD wad (<Code>$1 = 1e18</Code>) - see Units &amp; USDT settlement.</>],
             [<Mono>dueDate</Mono>, "Unix timestamp of invoice maturity."],
             [<Mono>riskScore / discountRateBps</Mono>, "Written once by the verified sentry at underwriting."],
             [<Mono>isUnderwritten / isSettled</Mono>, "Lifecycle flags gating streaming and settlement."],
@@ -365,17 +365,18 @@ const SECTIONS = [
         <P>
           <Code>SynturaVault.sol</Code> is the protocol's money layer:
           liquidity pool, streaming escrow and settlement engine, denominated
-          in native BOT. All value-moving functions are non-reentrant, and
+          in bridged USDT. All value-moving functions are non-reentrant, and
           transfers out use pull-over-push wherever an actor can claim instead.
         </P>
         <KVTable
           rows={[
-            [<Mono>depositLiquidity()</Mono>, "Payable. Adds principal to the pool; pending yield is checkpointed first (MasterChef-style accumulator)."],
+            [<Mono>depositLiquidity(amount)</Mono>, <>Pulls <Code>amount</Code> USDT via <Code>transferFrom</Code> - approve the vault first. Adds principal to the pool; pending yield is checkpointed first (MasterChef-style accumulator).</>],
             [<Mono>streamPayout(id)</Mono>, <>Advances <Code>face × (9000 - discountBps) / 10000</Code> to the supplier. Once per invoice; the AI-quoted discount is the pool's holdback.</>],
-            [<Mono>settleInvoice(id)</Mono>, <>Payable, must equal exact face value. Splits 9000/700/300 bps; supplier leg netted against the streamed advance.</>],
+            [<Mono>settleInvoice(id)</Mono>, <>Pulls exactly <Code>faceValueUnits(id)</Code> USDT from the caller, so the allowance must cover it. Splits 9000/700/300 bps; supplier leg netted against the streamed advance.</>],
             [<Mono>withdrawYield()</Mono>, "Pulls the caller's accrued share of pool fees."],
             [<Mono>withdrawLiquidity(amount)</Mono>, "Returns principal, capped at liquidity not financing outstanding advances."],
             [<Mono>availableLiquidity()</Mono>, <><Code>totalDeposits - totalOutstandingAdvances</Code> - what can stream or exit.</>],
+            [<Mono>faceValueUnits(id)</Mono>, <>The invoice's face value converted once to USDT base units - the exact amount settlement pulls.</>],
           ]}
         />
         <H2>The 90/7/3 waterfall</H2>
@@ -394,31 +395,71 @@ const SECTIONS = [
   {
     group: "Protocol",
     key: "value-scale",
-    title: "Value scale & settlement",
+    title: "Units & USDT settlement",
     body: (
       <>
         <P>
-          Invoices are USD-denominated instruments, while the vault moves
-          native BOT. The protocol bridges the two with one documented
-          constant:
+          Invoices are USD-denominated instruments, and Syntura settles them in
+          real dollars: the vault moves <Strong>bridged USDT on BOTChain</Strong>
+          {" "}1:1 against the face value written onchain. Every dollar figure in
+          the app is a literal dollar of stablecoin - there is no demo peg
+          anywhere in the protocol.
         </P>
         <div className="mt-6 rounded-lg border border-electric/25 bg-electric/[0.05] px-5 py-4 font-mono text-sm text-electric-soft">
-          1 USD = 10¹² wei of BOT&nbsp;&nbsp;·&nbsp;&nbsp;$125,000 face value
-          = 0.125 BOT settlement
+          $5.00 invoice&nbsp;&nbsp;·&nbsp;&nbsp;5000000000000000000 face value on
+          the NFT&nbsp;&nbsp;·&nbsp;&nbsp;5.000000 USDT pulled at settlement
         </div>
         <P>
-          Every UI amount you see in dollars maps to real native value at this
-          scale - streams, settlements, deposits and yield are all genuine
-          mainnet transfers at sane cost. The conversion lives in exactly one
-          place (<Code>usdToWei / weiToUsd</Code> in{" "}
-          <Code>src/lib/chain.js</Code>), so repointing the protocol at a
-          different scale - or a stablecoin - is a one-constant change.
+          Two scales coexist, one per layer, and each one is explicit in the ABI:
+        </P>
+        <KVTable
+          rows={[
+            [
+              <Mono>Invoice NFT · USD wad</Mono>,
+              <>Face value is stored as an 18-decimal USD wad (<Code>$1 = 1e18</Code>) - a unit of account, not a token balance. <Code>mintInvoice()</Code>, the <Code>faceValueUSD</Code> struct field and the NFT's own events all speak wad.</>,
+            ],
+            [
+              <Mono>Vault · USDT units</Mono>,
+              <>Every vault amount is 6-decimal USDT base units (<Code>$1 = 1e6</Code>): deposits, streamed advances, yield, the settlement legs, and all vault views and events.</>,
+            ],
+            [
+              <Mono>USD_WAD_PER_TOKEN_UNIT</Mono>,
+              <>The vault converts wad to token units internally by dividing by <Code>1e12</Code> (<Code>1e18 / 1e12 = 1e6</Code>), once per entry point, before any basis-point maths. Truncation drops anything below one micro-dollar, so the vault never pulls more than the debtor owes.</>,
+            ],
+            [
+              <Mono>faceValueUnits(id)</Mono>,
+              <>The <Strong>authoritative settlement amount</Strong> in USDT units, read straight from the vault. The dApp and the sentry service read it rather than repeating the conversion - one source of truth for what a debtor owes.</>,
+            ],
+          ]}
+        />
+        <H2>Settlement token</H2>
+        <KVTable
+          rows={[
+            ["Asset", <>Bridged <Strong>USDT</Strong> on BOT Chain Mainnet · 6 decimals</>],
+            ["Contract", addr(CONTRACTS.usdt)],
+            [
+              "Gas",
+              <>Still native <Strong>BOT</Strong>. USDT moves the value; every transaction - mint, approve, deposit, stream, settle - is paid for in BOT, so a wallet needs both.</>,
+            ],
+          ]}
+        />
+        <H2>Approve, then act</H2>
+        <P>
+          USDT is an ERC-20, so the vault can only pull what it has been allowed
+          to pull. Depositing liquidity and settling an invoice are therefore
+          two-step flows: an <Code>approve(vault, amount)</Code> transaction,
+          then the vault call itself -{" "}
+          <Code>depositLiquidity(amount)</Code> or <Code>settleInvoice(id)</Code>,
+          neither of them payable any more. The app approves the{" "}
+          <Strong>exact</Strong> amount needed, never an unlimited allowance, and
+          labels each step while it is in flight. When the existing allowance
+          already covers the amount, the approval is skipped and you sign once.
         </P>
         <P>
-          <Strong>Why not 1:1?</Strong> Settling a six-figure invoice with
-          six figures of BOT would make the demo unusable, and settling with
-          raw wei would make value legs invisible dust. 10¹² keeps every
-          transaction real, visible and affordable.
+          Because the numbers are now real money, they are small on purpose: a $5
+          invoice settles as exactly <Mono>5.000000</Mono> USDT, split 90 / 7 / 3
+          across supplier, pool and treasury on those token units, with rounding
+          dust absorbed by the treasury leg.
         </P>
       </>
     ),
@@ -541,7 +582,7 @@ const SECTIONS = [
         <Bullets
           items={[
             <>Reads <Code>totalInvoices()</Code>, then scans <Code>InvoiceMinted</Code> logs from the last processed block in bounded chunks. On a cold start - or whenever the state file is missing - it sweeps every id from <Mono>1</Mono> to <Mono>totalInvoices</Mono> instead, so invoices minted while the service was down are still collected.</>,
-            <>Rebuilds the model payload from the invoice struct plus <Code>tokenURI(id)</Code> metadata: debtor, face value at the <Code>1e12</Code> scale, due date, sector, supplier name and term days, deriving term days from the mint block timestamp when the metadata is thin.</>,
+            <>Rebuilds the model payload from the invoice struct plus <Code>tokenURI(id)</Code> metadata: debtor, face value as an 18-decimal USD wad, due date, sector, supplier name and term days, deriving term days from the mint block timestamp when the metadata is thin.</>,
             <>Runs the same <Code>underwriteInvoice()</Code> model the browser runs, then re-reads <Code>getInvoice(id)</Code> as a race guard immediately before sending.</>,
             <>Sends <Code>underwriteInvoice()</Code> and <Code>commitRiskScore()</Code> sequentially - nonce order matters - awaiting confirmations between them, and logs one structured line per invoice carrying both tx hashes.</>,
             <>Persists <Code>{"{ lastProcessedBlock, pending, done }"}</Code> atomically, so a restart resumes exactly where it stopped.</>,
@@ -642,7 +683,7 @@ const SECTIONS = [
           rows={[
             [<Mono>BOTCHAIN_RPC_URL / _CHAIN_ID</Mono>, "Hardhat deploy target (defaults to the verified mainnet values)."],
             [<Mono>PRIVATE_KEY</Mono>, "Deployer wallet - becomes owner, treasury fallback and the registered sentry."],
-            [<Mono>VITE_*_ADDRESS</Mono>, "The three deployed contract addresses; the app reads all state from them."],
+            [<Mono>VITE_*_ADDRESS</Mono>, <>The three deployed contract addresses; the app reads all state from them. <Code>VITE_USDT_ADDRESS</Code> overrides the settlement token, which defaults to the bridged USDT in Units &amp; USDT settlement and is also required for live mode.</>],
             [<Mono>VITE_DEPLOY_BLOCK</Mono>, "First block for event scans - set it to the deploy block to keep reads fast."],
           ]}
         />
