@@ -437,21 +437,11 @@ export default function Landing({ onLaunch }) {
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pb-28 lg:pt-24">
         <div className="min-w-0">
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-emeraldx" />
-            BOTChain Builder Challenge · Season 2 - AI × RWA
-          </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.08 }}
-            className="mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]"
+            className="text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]"
           >
             We turn 60-day invoices into{" "}
             <span className="text-gradient">60-second liquidity.</span>
