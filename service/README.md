@@ -19,15 +19,49 @@ predicted at mint time. Anyone can rerun the model and check the `auditHash`.
 
 The browser never holds a sentry key. This process does, and nothing else.
 
+## Safe to run beside other services
+
+This process is deliberately boring infrastructure and cannot collide with
+anything already on the box:
+
+- **Binds no ports.** It is an outbound poller. No listener, so no port
+  conflict, no firewall rule, no reverse-proxy entry.
+- **Installs nothing globally.** `npm ci` writes only to `service/node_modules`.
+  There is no `npm i -g`, no system package, no PATH change.
+- **Touches no shared config.** It never edits nginx, Caddy, Docker, cron or
+  any other unit. The only file it writes at runtime is its own `state.json`.
+- **Own systemd unit and user.** `syntura-sentry` running as a dedicated
+  unprivileged user, hardened with `ProtectSystem=strict`, `ProtectHome`,
+  `NoNewPrivileges` and a single `ReadWritePaths` entry.
+- **Tiny footprint.** One Node process, idle between 6-second polls; a few
+  dozen MB of RSS.
+- **Fully reversible.** See Uninstall below - one command and every trace is
+  gone.
+
+If another Node app pins an older runtime, do not touch the system Node.
+Install a private copy and point the unit at it:
+
+```bash
+curl -fsSL https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz \
+  | sudo tar -xJ -C /opt --transform 's|^node-v22.11.0-linux-x64|syntura-node|'
+# then in the unit: ExecStart=/opt/syntura-node/bin/node sentry.js
+```
+
+Nothing else on the machine sees that binary - no symlinks, no PATH edits.
+
 ## Deploy on a VPS
 
 ```bash
-git clone https://github.com/mrnetwork0001/Syntura.git /opt/syntura
+# a dedicated unprivileged user, no login shell, no home directory
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin syntura
+
+sudo git clone https://github.com/mrnetwork0001/Syntura.git /opt/syntura
 cd /opt/syntura/service
-npm ci
+sudo npm ci --omit=dev
 cp .env.example .env
 chmod 600 .env
 $EDITOR .env            # set SENTRY_PRIVATE_KEY, check the addresses
+sudo chown -R syntura:syntura /opt/syntura
 ```
 
 `npm ci` runs inside `service/` only. The service imports the shared model by
@@ -56,6 +90,20 @@ journalctl -fu syntura-sentry
 
 `ProtectSystem=strict` is on, so keep `STATE_FILE` inside the unit's
 `ReadWritePaths`.
+
+## Uninstall
+
+```bash
+sudo systemctl disable --now syntura-sentry
+sudo rm /etc/systemd/system/syntura-sentry.service
+sudo systemctl daemon-reload
+sudo rm -rf /opt/syntura
+sudo userdel syntura
+```
+
+Nothing else on the host is affected. Onchain state is untouched - a new sentry
+can be registered and started at any time, and the catch-up sweep picks up
+whatever was missed.
 
 ## Register the sentry address
 
