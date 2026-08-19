@@ -51,33 +51,55 @@ Nothing else on the machine sees that binary - no symlinks, no PATH edits.
 
 ## Deploy on a VPS
 
-```bash
-# a dedicated unprivileged user, no login shell, no home directory
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin syntura
+Do not paste this page as one block - step 2 runs on your own machine, and
+`sudo systemctl start` must wait until the smoke test passes.
 
+**Step 1 - on the VPS.** Create the user and the clone:
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin syntura
 sudo git clone https://github.com/mrnetwork0001/Syntura.git /opt/syntura
 cd /opt/syntura/service
 sudo npm ci --omit=dev
-cp .env.example .env
-chmod 600 .env
-$EDITOR .env            # set SENTRY_PRIVATE_KEY, check the addresses
-sudo chown -R syntura:syntura /opt/syntura
 ```
+
+`useradd` reporting "already exists" is fine if that account is yours; on a
+shared host confirm it is not someone else's with `id syntura` first.
+
+**Step 2 - on your own machine.** Copy up the `.env` holding the sentry key:
+
+```bash
+scp service/.env user@your-vps:/tmp/syntura.env
+```
+
+No local `.env` yet? Copy `.env.example` to `.env`, set `SENTRY_PRIVATE_KEY` to
+a dedicated key, and register its address (see below). Editing the file
+directly on the VPS with `sudo nano /opt/syntura/service/.env` works too.
+
+**Step 3 - back on the VPS.** Put it in place and smoke test BEFORE installing
+the unit:
+
+```bash
+sudo mv /tmp/syntura.env /opt/syntura/service/.env
+sudo chmod 600 /opt/syntura/service/.env
+sudo chown -R syntura:syntura /opt/syntura
+
+cd /opt/syntura/service && sudo -u syntura node sentry.js --once
+```
+
+Expect the wallet address, `sentry is registry-verified`, a catch-up sweep line
+and a clean stop. If instead you see `BOTCHAIN_RPC_URL is not set`, the `.env`
+did not land - fix that before continuing, or systemd will restart-loop on a
+missing `EnvironmentFile`.
 
 `npm ci` runs inside `service/` only. The service imports the shared model by
 relative path, so the repo must stay intact around it.
 
-Smoke test one pass (safe: it only sends transactions for invoices that are
-genuinely awaiting underwriting):
+`--once` is safe to rerun at any time: it only sends transactions for invoices
+genuinely awaiting underwriting, exits 0 after a completed pass and 1 if the
+pass could not run at all, so it also works as-is under cron.
 
-```bash
-node sentry.js --once
-```
-
-It exits 0 after a completed pass and 1 if the pass could not run at all, so it
-works as-is under cron.
-
-Then install the unit:
+**Step 4 - install the unit**, only after step 3 printed a clean pass:
 
 ```bash
 sudo cp syntura-sentry.service /etc/systemd/system/
