@@ -21,7 +21,7 @@ import { useSyntura } from "../context/SynturaStore.jsx";
 import BrandMark from "../components/ui/BrandMark.jsx";
 import { underwriteInvoice, SENTRY_MODEL_ID } from "../agent/aiSentryAgent.js";
 import { BOTCHAIN } from "../lib/chain.js";
-import { cn, formatUSD, formatPercent, bpsToPercent } from "../lib/utils.js";
+import { cn, formatUSD, bpsToPercent } from "../lib/utils.js";
 
 const GITHUB_URL = "https://github.com/mrnetwork0001/Syntura";
 const X_URL = "https://x.com/SynturaHQ";
@@ -402,16 +402,16 @@ const TRUST = [
 ];
 
 export default function Landing({ onLaunch }) {
-  const { invoices, vault } = useSyntura();
+  const { invoices, vault, protocolStats } = useSyntura();
 
   const heroStats = [
-    { label: "Invoices", value: String(invoices.length) },
+    { label: "Invoices tokenized", value: String(invoices.length) },
     {
-      label: "Total liquidity",
+      label: "Liquidity in USDT",
       value: formatUSD(vault.totalLiquidityUSD, { compact: true }),
     },
-    { label: "Pool return", value: formatPercent(vault.averageYieldAPY) },
-    { label: "Chain ID", value: String(BOTCHAIN.chainId) },
+    { label: "AI verdicts onchain", value: String(protocolStats.verdicts) },
+    { label: "Wallets", value: String(protocolStats.participants) },
   ];
 
   return (

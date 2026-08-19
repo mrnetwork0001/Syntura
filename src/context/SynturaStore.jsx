@@ -157,6 +157,11 @@ export function SynturaProvider({ children }) {
   const [vault, setVault] = useState(EMPTY_VAULT);
   const [auditLog, setAuditLog] = useState([]);
   const [sentries, setSentries] = useState([]);
+  const [protocolStats, setProtocolStats] = useState({
+    participants: 0,
+    verdicts: 0,
+    settlements: 0,
+  });
   const [wallet, setWallet] = useState({
     address: null,
     connecting: false,
@@ -362,6 +367,20 @@ export function SynturaProvider({ children }) {
           commitments: commitCount[e.args.agent.toLowerCase()] || 0,
           verified: true,
         }));
+
+        // Distinct wallets that have actually used the protocol - suppliers who
+        // minted plus providers who supplied liquidity. Sentries are excluded:
+        // they are protocol infrastructure, not participants.
+        const participants = new Set([
+          ...minted.map((e) => e.args.supplier.toLowerCase()),
+          ...deposited.map((e) => e.args.provider.toLowerCase()),
+          ...withdrawn.map((e) => e.args.provider.toLowerCase()),
+        ]);
+        setProtocolStats({
+          participants: participants.size,
+          verdicts: underwritten.length,
+          settlements: settled.length,
+        });
 
         // ── Vault stats (+ per-wallet position) ──
         let yourDepositUnits = 0n;
@@ -848,6 +867,7 @@ export function SynturaProvider({ children }) {
       vault,
       auditLog,
       sentries,
+      protocolStats,
       wallet,
       isSentry,
       liveMode,
@@ -872,6 +892,7 @@ export function SynturaProvider({ children }) {
       vault,
       auditLog,
       sentries,
+      protocolStats,
       wallet,
       isSentry,
       liveMode,
