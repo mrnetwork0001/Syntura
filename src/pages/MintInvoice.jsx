@@ -12,10 +12,13 @@ import {
   Minus,
   LayoutDashboard,
   RotateCcw,
+  RefreshCw,
   AlertTriangle,
   Bot,
   FileText,
   Waves,
+  Radar,
+  XCircle,
 } from "lucide-react";
 import {
   GlassCard,
@@ -62,18 +65,18 @@ const PIPELINE_STEPS = [
   },
   {
     icon: BrainCircuit,
-    title: "AI Sentry underwrites in seconds",
+    title: "Preview the model verdict locally",
     note: "Multi-factor risk scoring, fraud detection & discount pricing.",
   },
   {
-    icon: Fingerprint,
-    title: "Audit hash committed onchain",
-    note: "A deterministic commitment makes every decision verifiable.",
+    icon: BrandMark,
+    title: "Mint the ERC-721 on BOTChain",
+    note: "One wallet approval turns the receivable into an RWA NFT.",
   },
   {
-    icon: BrandMark,
-    title: "ERC-721 minted on BOTChain",
-    note: "Your invoice becomes a yield-streaming RWA NFT instantly.",
+    icon: Radar,
+    title: "Autonomous AI Sentry underwrites onchain",
+    note: "An independent registered service reruns the same model and commits the audit hash.",
   },
 ];
 
@@ -146,17 +149,77 @@ function Metric({ label, value, tone = "text-white" }) {
   );
 }
 
+/**
+ * Compares the verdict the sentry wrote onchain against the one this browser
+ * predicted from the same inputs. Identical values are the whole determinism
+ * claim, so a mismatch is stated plainly rather than hidden.
+ */
+function DeterminismChip({ local, onchain }) {
+  if (!local || !onchain) return null;
+  const sameHash =
+    typeof onchain.auditHash === "string" &&
+    onchain.auditHash.toLowerCase() === local.auditHash.toLowerCase();
+  const match =
+    onchain.riskScore === local.riskScore &&
+    onchain.discountRateBps === local.discountRateBps &&
+    sameHash;
+
+  if (match) {
+    return (
+      <div className="mt-4 rounded-xl border border-emeraldx/25 bg-emeraldx/[0.06] px-4 py-2.5 text-left">
+        <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
+          <ShieldCheck size={11} /> Determinism verified
+        </p>
+        <p className="mt-1 text-[11px] text-slate-400">
+          Onchain verdict matches the local model exactly - deterministic. Risk{" "}
+          {onchain.riskScore}/100 · {bpsToPercent(onchain.discountRateBps)} ·
+          same audit hash.
+        </p>
+        <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+          {onchain.auditHash}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/[0.06] px-4 py-2.5 text-left">
+      <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+        <XCircle size={11} /> Verdict differs from the local prediction
+      </p>
+      <p className="mt-1 text-[11px] text-slate-400">
+        Onchain risk {onchain.riskScore}/100 @{" "}
+        {bpsToPercent(onchain.discountRateBps)} vs locally predicted{" "}
+        {local.riskScore}/100 @ {bpsToPercent(local.discountRateBps)}
+        {sameHash ? "" : " · audit hashes differ"}. The onchain verdict is
+        authoritative - the sentry may have run against different metadata or a
+        different as-of date.
+      </p>
+      <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+        onchain {onchain.auditHash || "unavailable"}
+      </p>
+    </div>
+  );
+}
+
 export default function MintInvoice() {
-  const { tokenizeInvoice } = useSyntura();
+  const { tokenizeInvoice, awaitUnderwriting, underwriteAsSentry, isSentry } =
+    useSyntura();
 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
-  // idle -> analyzing -> result -> minting -> minted
+  // idle -> analyzing -> result -> minting -> awaitingSentry -> minted
+  // (awaitingSentry can also land on sentryTimeout)
   const [phase, setPhase] = useState("idle");
   const [stageIndex, setStageIndex] = useState(0);
   const [result, setResult] = useState(null);
   const [analyzedPayload, setAnalyzedPayload] = useState(null);
   const [mintedInvoice, setMintedInvoice] = useState(null);
+  // Verdict predicted locally at mint time - frozen so a later re-run of the
+  // form cannot rewrite the baseline the determinism chip compares against.
+  const [localVerdict, setLocalVerdict] = useState(null);
+  const [onchainVerdict, setOnchainVerdict] = useState(null);
+  const [sentryBusy, setSentryBusy] = useState(false);
   const [mintError, setMintError] = useState(null);
   const [doc, setDoc] = useState(null); // { name, size, hash } - SHA-256, hashed locally
   const [hashing, setHashing] = useState(false);
@@ -188,9 +251,14 @@ export default function MintInvoice() {
 
   const timersRef = useRef([]);
   const dueDateTouched = useRef(false);
+  // Generation counter: a poll started before a reset must not write back.
+  const watchRef = useRef(0);
+  const aliveRef = useRef(true);
 
   useEffect(
     () => () => {
+      aliveRef.current = false;
+      watchRef.current += 1;
       timersRef.current.forEach(clearTimeout);
     },
     []
@@ -228,7 +296,8 @@ export default function MintInvoice() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (phase === "analyzing" || phase === "minting") return;
+    if (phase === "analyzing" || phase === "minting" || phase === "awaitingSentry")
+      return;
     const nextErrors = validate(form);
     setErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) return;
@@ -243,8 +312,11 @@ export default function MintInvoice() {
     };
 
     clearTimers();
+    watchRef.current += 1;
     setMintError(null);
     setMintedInvoice(null);
+    setLocalVerdict(null);
+    setOnchainVerdict(null);
     setResult(null);
     setStageIndex(0);
     setPhase("analyzing");
@@ -268,25 +340,63 @@ export default function MintInvoice() {
     );
   };
 
+  /** Polls the chain for the autonomous sentry's verdict on a minted invoice. */
+  const watchSentry = async (id, options) => {
+    const generation = (watchRef.current += 1);
+    // No id means the mint receipt carried no InvoiceMinted log - there is
+    // nothing to poll, so surface the awaiting state instead of spinning.
+    if (!id) {
+      setPhase("sentryTimeout");
+      return;
+    }
+    setPhase("awaitingSentry");
+    const outcome = await awaitUnderwriting(id, options);
+    if (!aliveRef.current || watchRef.current !== generation) return;
+    if (outcome.underwritten) {
+      setOnchainVerdict(outcome);
+      setPhase("minted");
+    } else {
+      setPhase("sentryTimeout");
+    }
+  };
+
   const handleMint = async () => {
     if (!result || !analyzedPayload || phase === "minting") return;
     setMintError(null);
+    setOnchainVerdict(null);
     setPhase("minting");
+    let invoice;
     try {
-      const invoice = await tokenizeInvoice(
+      invoice = await tokenizeInvoice(
         { ...analyzedPayload, docHash: doc?.hash, docName: doc?.name },
         result
       );
-      setMintedInvoice(invoice);
-      setPhase("minted");
     } catch {
       setPhase("result");
       setMintError("Mint transaction failed - please retry.");
+      return;
+    }
+    // Mint is final from here - never fall back to the mint-failed path.
+    setMintedInvoice(invoice);
+    setLocalVerdict(result);
+    await watchSentry(invoice.id);
+  };
+
+  /** Operator fallback - only offered when the connected wallet is a sentry. */
+  const handleUnderwriteAsSentry = async () => {
+    if (!mintedInvoice || sentryBusy) return;
+    setSentryBusy(true);
+    try {
+      await underwriteAsSentry(mintedInvoice.id);
+      await watchSentry(mintedInvoice.id, { timeoutMs: 20_000, intervalMs: 3_000 });
+    } finally {
+      if (aliveRef.current) setSentryBusy(false);
     }
   };
 
   const handleReset = () => {
     clearTimers();
+    watchRef.current += 1;
     dueDateTouched.current = false;
     setForm(defaultForm());
     setDoc(null);
@@ -294,6 +404,8 @@ export default function MintInvoice() {
     setResult(null);
     setAnalyzedPayload(null);
     setMintedInvoice(null);
+    setLocalVerdict(null);
+    setOnchainVerdict(null);
     setMintError(null);
     setStageIndex(0);
     setPhase("idle");
@@ -305,7 +417,8 @@ export default function MintInvoice() {
     );
   };
 
-  const busy = phase === "analyzing" || phase === "minting";
+  const busy =
+    phase === "analyzing" || phase === "minting" || phase === "awaitingSentry";
   const invoiceTag = mintedInvoice
     ? `#SYNV-${String(mintedInvoice.id).padStart(3, "0")}`
     : null;
@@ -318,7 +431,7 @@ export default function MintInvoice() {
     >
       <SectionTitle
         title="Tokenize an Invoice"
-        subtitle="Turn a real-world receivable into a yield-streaming RWA NFT - underwritten by the AI Risk Sentry before it ever touches the chain."
+        subtitle="Turn a real-world receivable into a yield-streaming RWA NFT - one wallet approval mints it, then the autonomous AI Risk Sentry underwrites it onchain."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -460,9 +573,9 @@ export default function MintInvoice() {
               ) : (
                 <>
                   <BrainCircuit size={16} />
-                  {phase === "result" || phase === "minted" || phase === "minting"
-                    ? "Re-run AI Underwriting"
-                    : "Run AI Underwriting"}
+                  {phase === "idle"
+                    ? "Run AI Underwriting"
+                    : "Re-run AI Underwriting"}
                 </>
               )}
             </button>
@@ -610,7 +723,7 @@ export default function MintInvoice() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-white">
-                          Underwriting Complete
+                          Underwriting Preview
                         </h3>
                         <p className="font-mono text-[11px] text-slate-400">
                           {SENTRY_MODEL_ID}
@@ -705,6 +818,12 @@ export default function MintInvoice() {
                     <p className="break-all font-mono text-[11px] text-slate-400">
                       {result.auditHash}
                     </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                      Predicted in your browser. After you mint, the autonomous
+                      AI Sentry reruns the same open-source model from its own
+                      registered key and commits its verdict onchain - the two
+                      must land on this exact hash.
+                    </p>
                   </div>
 
                   <button
@@ -736,7 +855,140 @@ export default function MintInvoice() {
               </motion.div>
             )}
 
-            {phase === "minted" && mintedInvoice && result && (
+            {phase === "awaitingSentry" && mintedInvoice && (
+              <motion.div
+                key="awaitingSentry"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.35 }}
+              >
+                <GlassCard>
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-electric/40 bg-electric/10 text-electric-soft shadow-glow-blue">
+                      <Radar size={18} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">
+                        Invoice {invoiceTag} minted
+                      </h3>
+                      <p className="font-mono text-[11px] text-slate-400">
+                        the autonomous AI Sentry is underwriting onchain…
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="glass-inset rounded-xl p-4">
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      Waiting for
+                    </p>
+                    <p className="mt-1.5 flex items-center gap-2 font-mono text-xs text-slate-300">
+                      <Loader2 size={13} className="animate-spin text-electric-soft" />
+                      InvoiceUnderwritten(#{mintedInvoice.id}) · polling BOTChain
+                      every 4s
+                    </p>
+                    <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+                      Underwriting is not yours to sign. The AI Sentry is an
+                      independent service running{" "}
+                      <span className="font-mono text-slate-300">
+                        {SENTRY_MODEL_ID}
+                      </span>{" "}
+                      under its own registry-verified key - it watches for new
+                      invoices, reruns the model, and writes the verdict plus the
+                      audit commitment itself. Your browser never holds a sentry
+                      key.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400">
+                    <Badge status="Pending" />
+                    <span>Mint transaction</span>
+                    <TxLink hash={mintedInvoice.txHash} />
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {phase === "sentryTimeout" && mintedInvoice && (
+              <motion.div
+                key="sentryTimeout"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.35 }}
+              >
+                <GlassCard>
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                      <Radar size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">
+                        Invoice {invoiceTag} minted · awaiting underwriting
+                      </h3>
+                      <p className="font-mono text-[11px] text-slate-400">
+                        no sentry verdict onchain yet
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    The NFT is live and nothing is lost - the invoice simply sits
+                    Pending until the autonomous sentry picks it up. The service
+                    sweeps every un-underwritten invoice when it next runs, so it
+                    will be underwritten without any action from you.
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400">
+                    <Badge status="Pending" />
+                    <span>Mint transaction</span>
+                    <TxLink hash={mintedInvoice.txHash} />
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => watchSentry(mintedInvoice.id)}
+                      className="btn-primary flex-1 justify-center"
+                    >
+                      <RefreshCw size={16} />
+                      Check again
+                    </button>
+                    {isSentry && (
+                      <button
+                        type="button"
+                        onClick={handleUnderwriteAsSentry}
+                        disabled={sentryBusy}
+                        className="btn-ghost flex-1 justify-center"
+                      >
+                        {sentryBusy ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Underwriting…
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck size={16} />
+                            Underwrite now (sentry wallet)
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goToDashboard}
+                    className="mt-3 inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500 transition-colors hover:text-electric-soft"
+                  >
+                    <LayoutDashboard size={12} />
+                    Track it in the Dashboard
+                  </button>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {phase === "minted" && mintedInvoice && onchainVerdict && (
               <motion.div
                 key="minted"
                 initial={{ opacity: 0, scale: 0.96 }}
@@ -755,11 +1007,11 @@ export default function MintInvoice() {
                       <CheckCircle2 size={30} />
                     </motion.div>
                     <h3 className="text-xl font-bold tracking-tight text-white">
-                      Invoice {invoiceTag} Minted
+                      Invoice {invoiceTag} Underwritten
                     </h3>
                     <p className="mt-1 text-sm text-slate-400">
-                      ERC-721 RWA Invoice NFT live on BOTChain - AI underwriting
-                      committed onchain.
+                      ERC-721 RWA Invoice NFT live on BOTChain - the autonomous
+                      AI Sentry committed its verdict onchain.
                     </p>
 
                     <div className="mt-6 grid w-full grid-cols-2 gap-3 text-left sm:grid-cols-4">
@@ -769,21 +1021,26 @@ export default function MintInvoice() {
                         value={formatUSD(mintedInvoice.faceValueUSD)}
                       />
                       <Metric
-                        label="AI Risk Score"
-                        value={`${mintedInvoice.riskScore}/100`}
+                        label="Onchain Risk Score"
+                        value={`${onchainVerdict.riskScore}/100`}
                         tone="text-emeraldx-soft"
                       />
                       <Metric
-                        label="Discount"
-                        value={bpsToPercent(mintedInvoice.discountRateBps)}
+                        label="Onchain Discount"
+                        value={bpsToPercent(onchainVerdict.discountRateBps)}
                       />
                     </div>
 
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs text-slate-400">
-                      <Badge status={mintedInvoice.status} />
-                      <span>Transaction</span>
+                      <Badge status="Underwritten" />
+                      <span>Mint transaction</span>
                       <TxLink hash={mintedInvoice.txHash} />
                     </div>
+
+                    <DeterminismChip
+                      local={localVerdict}
+                      onchain={onchainVerdict}
+                    />
 
                     {mintedInvoice.docHash && (
                       <div className="mt-4 rounded-xl border border-emeraldx/20 bg-emeraldx/5 px-4 py-2.5 text-left">

@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Loader2,
   ReceiptText,
-  Hourglass,
 } from "lucide-react";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import {
@@ -60,8 +59,13 @@ function riskTextColor(score) {
   return "text-rose-400";
 }
 
-/** Per-row async action: Start Stream (Underwritten) or Settle (Streaming). */
-function RowAction({ invoice, busy, onAct }) {
+/**
+ * Per-row async action: Start Stream (Underwritten), Settle (Streaming), or -
+ * for Pending rows - a queued-for-the-sentry indicator. The Underwrite button
+ * only appears for a registry-verified sentry wallet; everyone else waits for
+ * the autonomous service.
+ */
+function RowAction({ invoice, busy, isSentry, onAct }) {
   if (invoice.status === "Underwritten") {
     return (
       <button
@@ -113,15 +117,50 @@ function RowAction({ invoice, busy, onAct }) {
     );
   }
   return (
-    <span className="inline-flex min-w-[128px] items-center justify-center gap-1.5 text-xs font-medium text-slate-500">
-      <Hourglass size={13} />
-      Awaiting AI
-    </span>
+    <div className="inline-flex min-w-[128px] items-center justify-end gap-3">
+      <span
+        title="Queued for the autonomous sentry - an independent service underwrites it onchain"
+        className="inline-flex cursor-help items-center gap-2 text-xs font-medium text-slate-500"
+      >
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-electric-soft opacity-60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-electric-soft" />
+        </span>
+        Awaiting AI
+      </span>
+      {isSentry && (
+        <button
+          onClick={() => onAct(invoice)}
+          disabled={busy}
+          className="btn-ghost !px-3 !py-1.5 !text-[10px]"
+          title="Underwrite from the connected sentry wallet"
+        >
+          {busy ? (
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              Underwriting…
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={13} />
+              Underwrite
+            </>
+          )}
+        </button>
+      )}
+    </div>
   );
 }
 
 export default function Dashboard() {
-  const { invoices, vault, startStream, settleInvoice } = useSyntura();
+  const {
+    invoices,
+    vault,
+    startStream,
+    settleInvoice,
+    underwriteAsSentry,
+    isSentry,
+  } = useSyntura();
   const [pendingIds, setPendingIds] = useState(() => new Set());
 
   const stats = useMemo(() => {
@@ -137,6 +176,7 @@ export default function Dashboard() {
     try {
       if (invoice.status === "Underwritten") await startStream(invoice.id);
       else if (invoice.status === "Streaming") await settleInvoice(invoice.id);
+      else if (invoice.status === "Pending") await underwriteAsSentry(invoice.id);
     } finally {
       setPendingIds((prev) => {
         const next = new Set(prev);
@@ -412,7 +452,12 @@ export default function Dashboard() {
                         <TxLink hash={inv.txHash} />
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <RowAction invoice={inv} busy={busy} onAct={handleAction} />
+                        <RowAction
+                          invoice={inv}
+                          busy={busy}
+                          isSentry={isSentry}
+                          onAct={handleAction}
+                        />
                       </td>
                     </motion.tr>
                   );

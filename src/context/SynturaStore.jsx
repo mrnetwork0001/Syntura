@@ -17,6 +17,7 @@ import {
   BOTCHAIN,
   DEPLOY_BLOCK,
 } from "../lib/chain.js";
+import { underwriteInvoice as runSentryModel } from "../agent/aiSentryAgent.js";
 
 const SynturaContext = createContext(null);
 
@@ -29,10 +30,16 @@ const SynturaContext = createContext(null);
  * are configured in .env the store exposes an explicitly empty state
  * (`configured: false`) so the UI can say so instead of pretending.
  *
+ * Underwriting is NOT part of the mint flow: `underwriteInvoice` and
+ * `commitRiskScore` are gated to registry-verified sentries, so the supplier
+ * only mints and the autonomous sentry service (service/sentry.js) submits the
+ * verdict from its own key. `awaitUnderwriting` is how the UI waits for it.
+ *
  * Store API (stable - consumed by every page):
- *   invoices, vault, auditLog, sentries, wallet, liveMode, configured,
- *   loading, chainError, clearChainError(),
+ *   invoices, vault, auditLog, sentries, wallet, isSentry, liveMode,
+ *   configured, loading, chainError, clearChainError(),
  *   connect(), refresh(), tokenizeInvoice(payload, underwriting),
+ *   awaitUnderwriting(id, opts), underwriteAsSentry(id),
  *   startStream(id), settleInvoice(id), depositLiquidity(amountUSD),
  *   withdrawYield()
  */
@@ -63,6 +70,61 @@ function parseMetadata(uri) {
   }
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Rebuilds the exact model payload for an invoice from chain state + its
+ * metadata JSON, so a locally-run verdict is byte-identical to the one the
+ * autonomous sentry service computes. Raw (possibly absent) metadata values are
+ * passed straight through - the model normalizes them deterministically.
+ */
+async function buildModelPayload(invoiceNFT, provider, id) {
+  const [inv, uri, mintLogs] = await Promise.all([
+    invoiceNFT.getInvoice(id),
+    invoiceNFT.tokenURI(id).catch(() => ""),
+    invoiceNFT
+      .queryFilter(invoiceNFT.filters.InvoiceMinted(id), DEPLOY_BLOCK)
+      .catch(() => []),
+  ]);
+  const meta = parseMetadata(uri);
+  const mintEvt = mintLogs[mintLogs.length - 1];
+  const block = mintEvt
+    ? await provider.getBlock(mintEvt.blockNumber).catch(() => null)
+    : null;
+  // Pin the model's as-of day to the MINT block, exactly as service/sentry.js
+  // does. asOf is committed inside the audit hash, so anchoring both runs to
+  // the same day is what makes this fallback reproduce the service's verdict
+  // rather than a different one just because it ran on a later date.
+  const anchorMs = block ? Number(block.timestamp) * 1000 : Date.now();
+  const dueMs = Number(inv.dueDate) * 1000;
+  let termDays = Number(meta.termDays);
+  if (!Number.isFinite(termDays) || termDays <= 0) {
+    // Older/foreign metadata: recover the tenor from mint time to due date.
+    termDays = Math.max(1, Math.round((dueMs - anchorMs) / 86_400_000));
+  }
+  return {
+    debtorName: inv.debtorName,
+    supplierName: meta.supplierName,
+    sector: meta.sector,
+    faceValueUSD: weiToUsd(inv.faceValueUSD),
+    termDays,
+    dueDate: new Date(dueMs).toISOString().slice(0, 10),
+    asOf: new Date(anchorMs).toISOString().slice(0, 10),
+    debtorYearsTrading: meta.debtorYearsTrading,
+    priorInvoicesPaid: meta.priorInvoicesPaid,
+    priorInvoicesDefaulted: meta.priorInvoicesDefaulted,
+  };
+}
+
+/** auditHash lives in the event, not the struct - read it back from the log. */
+async function auditHashOf(invoiceNFT, id) {
+  const logs = await invoiceNFT
+    .queryFilter(invoiceNFT.filters.InvoiceUnderwritten(id), DEPLOY_BLOCK)
+    .catch(() => []);
+  const last = logs[logs.length - 1];
+  return last?.args?.auditHash ?? null;
+}
+
 function friendlyChainError(err, fallback) {
   if (err?.code === "ACTION_REJECTED") return "Transaction rejected in wallet.";
   if (err?.reason) return `Reverted: ${err.reason}`;
@@ -82,6 +144,7 @@ export function SynturaProvider({ children }) {
     connecting: false,
     balanceBOT: null,
   });
+  const [isSentry, setIsSentry] = useState(false);
   const [loading, setLoading] = useState(liveMode);
   const [chainError, setChainError] = useState(null);
 
@@ -267,16 +330,24 @@ export function SynturaProvider({ children }) {
         let yourYieldWei = 0n;
         if (address) {
           let balanceWei = 0n;
-          [yourDepositWei, yourYieldWei, balanceWei] = await Promise.all([
-            vaultC.depositOf(address),
-            vaultC.yieldOf(address),
-            provider.getBalance(address),
-          ]);
+          let verifiedSentry = false;
+          [yourDepositWei, yourYieldWei, balanceWei, verifiedSentry] =
+            await Promise.all([
+              vaultC.depositOf(address),
+              vaultC.yieldOf(address),
+              provider.getBalance(address),
+              sentryRegistry
+                ? sentryRegistry.isVerifiedSentry(address).catch(() => false)
+                : false,
+            ]);
           setWallet((w) =>
             w.address === address
               ? { ...w, balanceBOT: Number(balanceWei) / 1e18 }
               : w
           );
+          setIsSentry(Boolean(verifiedSentry));
+        } else {
+          setIsSentry(false);
         }
         const totalDepUSD = weiToUsd(totalDepWei);
         setVault({
@@ -326,6 +397,7 @@ export function SynturaProvider({ children }) {
       const res = await connectWallet();
       if (!res) {
         setWallet({ address: null, connecting: false, balanceBOT: null });
+        setIsSentry(false);
         setChainError("No wallet detected - install MetaMask (or any injected wallet) to transact.");
         return null;
       }
@@ -349,6 +421,7 @@ export function SynturaProvider({ children }) {
       return res.address;
     } catch (err) {
       setWallet({ address: null, connecting: false, balanceBOT: null });
+      setIsSentry(false);
       setChainError(friendlyChainError(err, "Wallet connection failed."));
       return null;
     }
@@ -358,6 +431,7 @@ export function SynturaProvider({ children }) {
   const disconnect = useCallback(() => {
     signerRef.current = null;
     setWallet({ address: null, connecting: false, balanceBOT: null });
+    setIsSentry(false);
   }, []);
 
   // Track the connected address across renders for the wallet event listeners.
@@ -408,13 +482,14 @@ export function SynturaProvider({ children }) {
   }, [liveMode, connect]);
 
   /**
-   * Mint an invoice NFT, then underwrite it onchain with the AI Sentry's
-   * verdict and anchor the audit hash in the registry. Throws on failure
-   * (MintInvoice surfaces the message).
+   * Mint an invoice NFT - ONE wallet approval, nothing else. Underwriting is
+   * the autonomous sentry's job (it holds the only registry-verified key), so
+   * the invoice comes back Pending and the caller waits via awaitUnderwriting.
+   * Throws on failure (MintInvoice surfaces the message).
    */
   const tokenizeInvoice = useCallback(
     async (payload, underwriting) => {
-      const { invoiceNFT, sentryRegistry } = await requireSigner();
+      const { invoiceNFT } = await requireSigner();
       const faceWei = usdToWei(payload.faceValueUSD);
       const dueUnix = Math.floor(new Date(payload.dueDate).getTime() / 1000);
       const metadataURI = JSON.stringify({
@@ -448,30 +523,6 @@ export function SynturaProvider({ children }) {
         .find((p) => p?.name === "InvoiceMinted");
       const id = Number(mintedEvt?.args?.invoiceId ?? 0);
 
-      try {
-        const uwTx = await invoiceNFT.underwriteInvoice(
-          id,
-          underwriting.riskScore,
-          underwriting.discountRateBps,
-          underwriting.auditHash
-        );
-        await uwTx.wait();
-        if (sentryRegistry) {
-          const cTx = await sentryRegistry.commitRiskScore(
-            id,
-            underwriting.riskScore,
-            underwriting.auditHash
-          );
-          await cTx.wait();
-        }
-      } catch (err) {
-        // Mint succeeded; underwriting is gated to registered sentries/owner.
-        await refresh();
-        throw new Error(
-          `Invoice #${id} minted (tx ${receipt.hash.slice(0, 10)}…) but onchain underwriting failed: ${friendlyChainError(err, "sentry not authorized")}. Underwrite from the registered sentry wallet.`
-        );
-      }
-
       await refresh();
       return {
         id,
@@ -482,18 +533,111 @@ export function SynturaProvider({ children }) {
         dueDate: payload.dueDate,
         termDays: Number(payload.termDays),
         sector: payload.sector,
-        riskScore: underwriting.riskScore,
+        riskScore: 0,
         fraudProbability: underwriting.fraudProbability,
         docHash: payload.docHash || null,
         docName: payload.docName || null,
-        discountRateBps: underwriting.discountRateBps,
-        status: "Underwritten",
+        discountRateBps: 0,
+        status: "Pending",
         streamedPct: 0,
         txHash: receipt.hash,
         mintedAt: new Date().toISOString().slice(0, 10),
       };
     },
     [requireSigner, refresh, wallet.address]
+  );
+
+  /**
+   * Polls the READ provider until the autonomous sentry has underwritten the
+   * invoice onchain. Transient RPC failures are swallowed and retried - only
+   * the deadline ends the wait.
+   */
+  const awaitUnderwriting = useCallback(
+    async (id, { timeoutMs = 120_000, intervalMs = 4_000 } = {}) => {
+      const { invoiceNFT } = getContracts(readProviderRef.current);
+      if (!invoiceNFT) return { underwritten: false, timedOut: true };
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        try {
+          const inv = await invoiceNFT.getInvoice(id);
+          if (inv.isUnderwritten) {
+            const auditHash = await auditHashOf(invoiceNFT, id);
+            await refresh();
+            return {
+              underwritten: true,
+              riskScore: Number(inv.riskScore),
+              discountRateBps: Number(inv.discountRateBps),
+              auditHash,
+            };
+          }
+        } catch {
+          /* transient RPC error - keep polling until the deadline */
+        }
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) return { underwritten: false, timedOut: true };
+        await sleep(Math.min(intervalMs, remaining));
+      }
+    },
+    [refresh]
+  );
+
+  /**
+   * Operator fallback: underwrite from the CONNECTED wallet when it is itself a
+   * registry-verified sentry (e.g. the service is down). Reruns the same model
+   * over onchain state, then sends underwriteInvoice + commitRiskScore
+   * sequentially. Returns the underwriting tx hash, or null with a chainError.
+   */
+  const underwriteAsSentry = useCallback(
+    async (id) => {
+      try {
+        const { invoiceNFT, sentryRegistry } = await requireSigner();
+        const address = await signerRef.current.getAddress();
+        const provider = readProviderRef.current;
+        const { sentryRegistry: registryRead } = getContracts(provider);
+        const verified = registryRead
+          ? await registryRead.isVerifiedSentry(address)
+          : false;
+        setIsSentry(Boolean(verified));
+        if (!verified) {
+          setChainError(
+            `Wallet ${address.slice(0, 6)}…${address.slice(-4)} is not a verified sentry - the registry owner must call registerSentry(${address}, "syntura-sentry-v1"), or leave Invoice #${id} to the autonomous sentry service.`
+          );
+          return null;
+        }
+
+        const onchain = await invoiceNFT.getInvoice(id);
+        if (onchain.isUnderwritten) {
+          await refresh();
+          return null;
+        }
+
+        const verdict = runSentryModel(
+          await buildModelPayload(invoiceNFT, provider, id)
+        );
+        const uwTx = await invoiceNFT.underwriteInvoice(
+          id,
+          verdict.riskScore,
+          verdict.discountRateBps,
+          verdict.auditHash
+        );
+        const receipt = await uwTx.wait();
+        if (sentryRegistry) {
+          // Sequential on purpose: same signer, nonce order matters.
+          const commitTx = await sentryRegistry.commitRiskScore(
+            id,
+            verdict.riskScore,
+            verdict.auditHash
+          );
+          await commitTx.wait();
+        }
+        await refresh();
+        return receipt.hash;
+      } catch (err) {
+        setChainError(friendlyChainError(err, "Sentry underwriting failed."));
+        return null;
+      }
+    },
+    [requireSigner, refresh]
   );
 
   /** Streams the pool advance to the supplier. Returns tx hash or null. */
@@ -571,6 +715,7 @@ export function SynturaProvider({ children }) {
       auditLog,
       sentries,
       wallet,
+      isSentry,
       liveMode,
       configured: liveMode,
       loading,
@@ -580,6 +725,8 @@ export function SynturaProvider({ children }) {
       disconnect,
       refresh,
       tokenizeInvoice,
+      awaitUnderwriting,
+      underwriteAsSentry,
       startStream,
       settleInvoice,
       depositLiquidity,
@@ -591,6 +738,7 @@ export function SynturaProvider({ children }) {
       auditLog,
       sentries,
       wallet,
+      isSentry,
       liveMode,
       loading,
       chainError,
@@ -599,6 +747,8 @@ export function SynturaProvider({ children }) {
       disconnect,
       refresh,
       tokenizeInvoice,
+      awaitUnderwriting,
+      underwriteAsSentry,
       startStream,
       settleInvoice,
       depositLiquidity,
