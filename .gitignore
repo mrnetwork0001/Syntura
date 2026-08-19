@@ -9,3 +9,10 @@ coverage/
 .DS_Store
 typechain-types/
 .claude/
+
+# Autonomous sentry service (node_modules/ and .env are covered above, but the
+# sentry key and its runtime journal are called out so they can never slip in)
+service/node_modules/
+service/.env
+service/state.json
+service/state.json.tmp

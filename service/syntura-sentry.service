@@ -1,0 +1,50 @@
+# Syntura autonomous AI Risk Sentry - systemd unit template.
+#
+# Replace SENTRY_USER and /opt/syntura with your real user and clone path, then:
+#   sudo cp service/syntura-sentry.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now syntura-sentry
+#
+# ProtectSystem=strict makes the whole filesystem read-only except ReadWritePaths,
+# so the state file must live under a listed path.
+
+[Unit]
+Description=Syntura autonomous AI Risk Sentry
+Documentation=https://github.com/mrnetwork0001/Syntura
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=SENTRY_USER
+Group=SENTRY_USER
+WorkingDirectory=/opt/syntura/service
+EnvironmentFile=/opt/syntura/service/.env
+ExecStart=/usr/bin/node sentry.js
+Restart=always
+RestartSec=5
+# Graceful stop: the sentry finishes its in-flight invoice, persists state, exits.
+KillSignal=SIGTERM
+TimeoutStopSec=90
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=syntura-sentry
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+# Node's JIT needs writable+executable pages, so MemoryDenyWriteExecute stays off.
+ReadWritePaths=/opt/syntura/service
+
+[Install]
+WantedBy=multi-user.target
