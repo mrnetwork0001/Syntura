@@ -102,9 +102,10 @@ function validate(form) {
   const fv = Number(form.faceValueUSD);
   if (!form.faceValueUSD || Number.isNaN(fv))
     errors.faceValueUSD = "Enter the invoice face value in USD.";
-  else if (fv < 100) errors.faceValueUSD = "Minimum tokenizable value is $100.";
-  else if (fv > 50_000_000)
-    errors.faceValueUSD = "Maximum tokenizable value is $50,000,000.";
+  // Face value is settled 1:1 in real bridged USDT, so the floor is a dollar.
+  else if (fv < 1) errors.faceValueUSD = "Minimum tokenizable value is $1.";
+  else if (fv > 10_000_000)
+    errors.faceValueUSD = "Maximum tokenizable value is $10,000,000.";
   const term = Number(form.termDays);
   if (!form.termDays || Number.isNaN(term) || !Number.isInteger(term))
     errors.termDays = "Payment term must be a whole number of days.";
@@ -491,17 +492,23 @@ export default function MintInvoice() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Face Value (USD)" error={errors.faceValueUSD}>
+                {/* step allows cents: usdToWad rounds to the cent and this is a
+                    submitting form, so native validation must not reject 12.34. */}
                 <input
                   type="number"
                   className="input-glass"
-                  placeholder="125000"
-                  min="100"
-                  max="50000000"
-                  step="1"
+                  placeholder="e.g. 5"
+                  min="1"
+                  max="10000000"
+                  step="0.01"
                   value={form.faceValueUSD}
                   onChange={(e) => setField("faceValueUSD", e.target.value)}
                   disabled={busy}
                 />
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                  Settled 1:1 in bridged USDT - the debtor pays this exact
+                  amount. $1 minimum, $10,000,000 maximum.
+                </p>
               </Field>
 
               <Field label="Payment Term (days)" error={errors.termDays}>
@@ -763,7 +770,10 @@ export default function MintInvoice() {
                       <span className="font-semibold text-slate-300">
                         {analyzedPayload.debtorName}
                       </span>
-                      <span>{formatUSD(analyzedPayload.faceValueUSD)}</span>
+                      <span>
+                        {formatUSD(analyzedPayload.faceValueUSD, { decimals: 2 })}{" "}
+                        USDT
+                      </span>
                       <span>{analyzedPayload.termDays}-day term</span>
                       <span>Due {formatDate(analyzedPayload.dueDate)}</span>
                       <span>{analyzedPayload.sector}</span>
@@ -1017,8 +1027,10 @@ export default function MintInvoice() {
                     <div className="mt-6 grid w-full grid-cols-2 gap-3 text-left sm:grid-cols-4">
                       <Metric label="Debtor" value={mintedInvoice.debtorName} />
                       <Metric
-                        label="Face Value"
-                        value={formatUSD(mintedInvoice.faceValueUSD)}
+                        label="Face Value · USDT"
+                        value={formatUSD(mintedInvoice.faceValueUSD, {
+                          decimals: 2,
+                        })}
                       />
                       <Metric
                         label="Onchain Risk Score"

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Landmark,
@@ -9,12 +9,14 @@ import {
   ArrowDownToLine,
   ArrowRight,
   ArrowDown,
+  ArrowUpRight,
   CheckCircle2,
   Loader2,
   Coins,
   Gauge,
   Split,
   Sparkles,
+  Wallet,
 } from "lucide-react";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import {
@@ -26,13 +28,18 @@ import {
 } from "../components/ui/Glass.jsx";
 import { cn, formatUSD, formatPercent } from "../lib/utils.js";
 
-const QUICK_PICKS = [1000, 10000, 50000];
+// Real money now moves: deposits are bridged USDT, so the picks are the
+// amounts a provider can actually try on mainnet.
+const QUICK_PICKS = [1, 5, 25];
+
+/** Where a wallet with no USDT can get some. Plain link, nothing embedded. */
+const USDT_DEX_URL = "https://dex.botchain.ai/";
 
 const YIELD_STEPS = [
   {
     icon: PiggyBank,
-    title: "Deposit liquidity",
-    body: "Your capital enters the Syntura streaming vault and joins the shared pool backing tokenized RWA invoices.",
+    title: "Approve, then deposit",
+    body: "You approve the exact USDT amount, the vault pulls it into the shared pool backing tokenized RWA invoices.",
     tile: "border-electric/30 bg-electric/10 text-electric-soft",
   },
   {
@@ -44,7 +51,7 @@ const YIELD_STEPS = [
   {
     icon: Coins,
     title: "Settlement yield flows back",
-    body: "When the debtor pays, 7% of every settlement routes pro-rata to providers - withdraw any time.",
+    body: "When the debtor settles in USDT, 7% of every settlement routes pro-rata to providers - withdraw any time.",
     tile: "border-emeraldx/30 bg-emeraldx/10 text-emeraldx-soft",
   },
 ];
@@ -76,18 +83,101 @@ const FEE_SEGMENTS = [
   },
 ];
 
+/**
+ * The deposit is an ERC-20 flow, so it is two transactions worth of waiting:
+ * an exact-amount approval (skipped when the standing allowance already covers
+ * it) and then the deposit itself. `txStep` from the store drives both rows.
+ */
+function DepositSteps({ txStep, approvalSeen }) {
+  const approveState =
+    txStep === "approving"
+      ? "active"
+      : txStep === "depositing" || txStep === "confirming"
+        ? "done"
+        : "pending";
+  const depositState =
+    txStep === "depositing" || txStep === "confirming" ? "active" : "pending";
+
+  const rows = [
+    {
+      key: "approve",
+      label: "Approving USDT",
+      state: approveState,
+      note:
+        approveState === "done" && !approvalSeen
+          ? "not needed - allowance already covers this deposit"
+          : "exact amount only, never an unlimited allowance",
+    },
+    {
+      key: "deposit",
+      label: "Depositing into the vault",
+      state: depositState,
+      note:
+        txStep === "confirming"
+          ? "waiting for the BOTChain receipt…"
+          : "transfers the USDT and credits your position",
+    },
+  ];
+
+  return (
+    <div className="glass-inset mt-4 space-y-2.5 rounded-xl p-4">
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        {txStep === "checking"
+          ? "Checking USDT balance & allowance"
+          : "Two-step deposit"}
+      </p>
+      {rows.map((row) => (
+        <div key={row.key} className="flex items-start gap-3 font-mono text-xs">
+          {row.state === "done" ? (
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emeraldx-soft" />
+          ) : row.state === "active" ? (
+            <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-electric-soft" />
+          ) : (
+            <span className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-slate-700" />
+          )}
+          <div className="min-w-0">
+            <p
+              className={cn(
+                row.state === "active"
+                  ? "text-white"
+                  : row.state === "done"
+                    ? "text-slate-300"
+                    : "text-slate-500"
+              )}
+            >
+              {row.label}
+            </p>
+            <p className="mt-0.5 text-[10px] text-slate-500">{row.note}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LiquidityVaults() {
-  const { vault, depositLiquidity, withdrawYield } = useSyntura();
+  const { vault, wallet, txStep, depositLiquidity, withdrawYield } = useSyntura();
 
   const [amountInput, setAmountInput] = useState("");
   const [depositing, setDepositing] = useState(false);
+  // True once this deposit actually prompted an approval, so the step list can
+  // say "not needed" instead of implying a signature that never happened.
+  const [approvalSeen, setApprovalSeen] = useState(false);
   const [depositTx, setDepositTx] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawTx, setWithdrawTx] = useState(null);
   const [lastWithdrawnUSD, setLastWithdrawnUSD] = useState(0);
 
+  useEffect(() => {
+    if (txStep === "approving") setApprovalSeen(true);
+  }, [txStep]);
+
   const amount = Number(amountInput);
   const amountValid = Number.isFinite(amount) && amount > 0;
+  const balanceUSDT = wallet.balanceUSDT;
+  const balanceKnown = typeof balanceUSDT === "number";
+  const overBalance = balanceKnown && amountValid && amount > balanceUSDT;
+  const canDeposit = amountValid && !overBalance && !depositing;
   const apy = vault.averageYieldAPY;
 
   const projection = useMemo(() => {
@@ -110,8 +200,9 @@ export default function LiquidityVaults() {
   const idleUSD = vault.totalLiquidityUSD - deployedUSD;
 
   const handleDeposit = async () => {
-    if (!amountValid || depositing) return;
+    if (!canDeposit) return;
     setDepositing(true);
+    setApprovalSeen(false);
     setDepositTx(null);
     try {
       const tx = await depositLiquidity(amount);
@@ -149,7 +240,7 @@ export default function LiquidityVaults() {
     >
       <SectionTitle
         title="Liquidity Vaults"
-        subtitle="Provide streaming liquidity to AI-underwritten RWA invoices and earn real-time settlement yield."
+        subtitle="Provide streaming liquidity in bridged USDT to AI-underwritten RWA invoices and earn real-time settlement yield."
         action={
           <span className="inline-flex items-center gap-2 rounded-full border border-emeraldx/30 bg-emeraldx/10 px-3 py-1 text-xs font-semibold text-emeraldx-soft">
             <Sparkles size={13} />
@@ -161,15 +252,15 @@ export default function LiquidityVaults() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Landmark}
-          label="Total Liquidity"
-          value={formatUSD(vault.totalLiquidityUSD)}
+          label="Total Liquidity · USDT"
+          value={formatUSD(vault.totalLiquidityUSD, { decimals: 2 })}
           accent="electric"
           index={0}
         />
         <StatCard
           icon={Waves}
-          label="Active Streams"
-          value={formatUSD(vault.activeStreamsUSD)}
+          label="Active Streams · USDT"
+          value={formatUSD(vault.activeStreamsUSD, { decimals: 2 })}
           accent="violet"
           index={1}
         />
@@ -207,26 +298,61 @@ export default function LiquidityVaults() {
                   Deposit Streaming Liquidity
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Capital is deployed into real-time invoice payout streams.
+                  Bridged USDT is deployed into real-time invoice payout streams.
                 </p>
               </div>
             </div>
 
             <label className="label-glass" htmlFor="vault-deposit-amount">
-              Deposit amount (USD)
+              Deposit amount (USDT)
             </label>
             <input
               id="vault-deposit-amount"
               type="number"
-              min="1"
-              step="100"
+              min="0.01"
+              step="0.01"
               inputMode="decimal"
-              placeholder="e.g. 25,000"
+              placeholder="e.g. 5"
               value={amountInput}
               onChange={(e) => setAmountInput(e.target.value)}
               disabled={depositing}
               className="input-glass mt-1.5 w-full font-mono text-lg"
             />
+
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+              <p className="font-mono text-[11px] text-slate-500">
+                <Wallet size={11} className="mr-1.5 inline align-[-1px]" />
+                {wallet.address ? (
+                  <>
+                    Wallet balance{" "}
+                    <span className="font-semibold text-slate-300">
+                      {balanceKnown ? formatUSD(balanceUSDT, { decimals: 2 }) : "…"}
+                    </span>{" "}
+                    USDT
+                  </>
+                ) : (
+                  "Connect a wallet to see your USDT balance"
+                )}
+                {balanceKnown && balanceUSDT > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAmountInput(String(balanceUSDT))}
+                    disabled={depositing}
+                    className="ml-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-electric-soft transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    Max
+                  </button>
+                )}
+              </p>
+              <a
+                href={USDT_DEX_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500 transition-colors hover:text-electric-soft"
+              >
+                Need USDT? <ArrowUpRight size={11} />
+              </a>
+            </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
               {QUICK_PICKS.map((v) => (
@@ -290,24 +416,44 @@ export default function LiquidityVaults() {
             <button
               type="button"
               onClick={handleDeposit}
-              disabled={!amountValid || depositing}
+              disabled={!canDeposit}
               className={cn(
                 "btn-primary mt-5 w-full",
-                (!amountValid || depositing) && "cursor-not-allowed opacity-50"
+                !canDeposit && "cursor-not-allowed opacity-50"
               )}
             >
               {depositing ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 size={16} className="animate-spin" />
-                  Depositing on BOTChain…
+                  {txStep === "approving"
+                    ? "Approving USDT…"
+                    : txStep === "confirming"
+                      ? "Confirming on BOTChain…"
+                      : txStep === "depositing"
+                        ? "Depositing on BOTChain…"
+                        : "Checking USDT balance…"}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2">
                   <Landmark size={16} />
-                  Deposit {amountValid ? formatUSD(amount) : "Liquidity"}
+                  Deposit{" "}
+                  {amountValid
+                    ? `${formatUSD(amount, { decimals: 2 })} USDT`
+                    : "Liquidity"}
                 </span>
               )}
             </button>
+
+            {overBalance && !depositing && (
+              <p className="mt-2 text-center text-[11px] text-rose-400">
+                Wallet holds {formatUSD(balanceUSDT, { decimals: 2 })} USDT - lower
+                the amount or top up before depositing.
+              </p>
+            )}
+
+            {depositing && (
+              <DepositSteps txStep={txStep} approvalSeen={approvalSeen} />
+            )}
 
             {depositTx && (
               <motion.div
@@ -338,22 +484,24 @@ export default function LiquidityVaults() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-white">Your Position</h3>
-                <p className="text-xs text-slate-400">Deposit, yield and pool share.</p>
+                <p className="text-xs text-slate-400">
+                  Deposit, yield and pool share - all in USDT.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="glass-inset flex items-center justify-between rounded-xl px-4 py-3">
                 <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Deposited
+                  Deposited · USDT
                 </span>
                 <span className="font-mono text-sm font-bold text-white">
-                  {formatUSD(vault.yourDepositUSD)}
+                  {formatUSD(vault.yourDepositUSD, { decimals: 2 })}
                 </span>
               </div>
               <div className="glass-inset flex items-center justify-between rounded-xl px-4 py-3">
                 <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Accrued yield
+                  Accrued yield · USDT
                 </span>
                 <span
                   className={cn(
@@ -410,7 +558,7 @@ export default function LiquidityVaults() {
                 >
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emeraldx-soft">
                     <CheckCircle2 size={14} />
-                    {formatUSD(lastWithdrawnUSD, { decimals: 2 })} paid out
+                    {formatUSD(lastWithdrawnUSD, { decimals: 2 })} USDT paid out
                   </span>
                   <TxLink hash={withdrawTx} />
                 </motion.div>
@@ -448,18 +596,18 @@ export default function LiquidityVaults() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="glass-inset rounded-xl px-4 py-3">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                  Deployed in streams
+                  Deployed in streams · USDT
                 </p>
                 <p className="mt-1 font-mono text-sm font-bold text-violetx-soft">
-                  {formatUSD(deployedUSD)}
+                  {formatUSD(deployedUSD, { decimals: 2 })}
                 </p>
               </div>
               <div className="glass-inset rounded-xl px-4 py-3">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                  Idle liquidity
+                  Idle liquidity · USDT
                 </p>
                 <p className="mt-1 font-mono text-sm font-bold text-slate-300">
-                  {formatUSD(idleUSD)}
+                  {formatUSD(idleUSD, { decimals: 2 })}
                 </p>
               </div>
             </div>

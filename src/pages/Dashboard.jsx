@@ -60,12 +60,23 @@ function riskTextColor(score) {
 }
 
 /**
+ * Settling is an ERC-20 pull, so the label names the stage the store is in -
+ * an approval may come first when the vault has no standing allowance.
+ */
+const SETTLE_STEP_LABEL = {
+  checking: "Checking USDT…",
+  approving: "Approving USDT…",
+  settling: "Settling…",
+  confirming: "Confirming…",
+};
+
+/**
  * Per-row async action: Start Stream (Underwritten), Settle (Streaming), or -
  * for Pending rows - a queued-for-the-sentry indicator. The Underwrite button
  * only appears for a registry-verified sentry wallet; everyone else waits for
  * the autonomous service.
  */
-function RowAction({ invoice, busy, isSentry, onAct }) {
+function RowAction({ invoice, busy, isSentry, txStep, onAct }) {
   if (invoice.status === "Underwritten") {
     return (
       <button
@@ -88,24 +99,35 @@ function RowAction({ invoice, busy, isSentry, onAct }) {
     );
   }
   if (invoice.status === "Streaming") {
+    const faceUSDT = formatUSD(invoice.faceValueUSD, { decimals: 2 });
     return (
-      <button
-        onClick={() => onAct(invoice)}
-        disabled={busy}
-        className="inline-flex min-w-[128px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emeraldx to-electric px-3.5 py-1.5 text-xs font-semibold text-white shadow-glow-emerald transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-      >
-        {busy ? (
-          <>
-            <Loader2 size={14} className="animate-spin" />
-            Settling…
-          </>
-        ) : (
-          <>
-            <CheckCircle2 size={14} />
-            Settle
-          </>
-        )}
-      </button>
+      <div className="inline-flex min-w-[128px] flex-col items-end gap-1.5">
+        <button
+          onClick={() => onAct(invoice)}
+          disabled={busy}
+          title={`Settling pulls ${faceUSDT} USDT from your wallet as the debtor - if the vault has no allowance yet, your wallet asks for an approval first, then the settlement (two transactions).`}
+          className="inline-flex min-w-[128px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emeraldx to-electric px-3.5 py-1.5 text-xs font-semibold text-white shadow-glow-emerald transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+        >
+          {busy ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              {SETTLE_STEP_LABEL[txStep] || "Settling…"}
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={14} />
+              Settle {faceUSDT}
+            </>
+          )}
+        </button>
+        <p className="max-w-[188px] text-right text-[10px] leading-snug text-slate-500">
+          {busy
+            ? txStep === "approving"
+              ? "Approve the exact USDT amount, then the settlement follows."
+              : "Two transactions may be needed - keep the wallet open."
+            : `Pulls ${faceUSDT} USDT from your wallet · approval first if the vault has no allowance`}
+        </p>
+      </div>
     );
   }
   if (invoice.status === "Settled") {
@@ -160,6 +182,7 @@ export default function Dashboard() {
     settleInvoice,
     underwriteAsSentry,
     isSentry,
+    txStep,
   } = useSyntura();
   const [pendingIds, setPendingIds] = useState(() => new Set());
 
@@ -245,7 +268,10 @@ export default function Dashboard() {
               Total Face Value Tokenized
             </p>
             <p className="mt-2 text-3xl font-extrabold tracking-tight text-white">
-              {formatUSD(stats.totalFaceValue)}
+              {formatUSD(stats.totalFaceValue, { decimals: 2 })}
+            </p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-600">
+              settled 1:1 in bridged USDT
             </p>
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between text-xs">
@@ -271,8 +297,8 @@ export default function Dashboard() {
         />
         <StatCard
           icon={Waves}
-          label="Total Streaming Liquidity"
-          value={formatUSD(vault.activeStreamsUSD)}
+          label="Total Streaming Liquidity · USDT"
+          value={formatUSD(vault.activeStreamsUSD, { decimals: 2 })}
           accent="violet"
           index={1}
         />
@@ -296,7 +322,7 @@ export default function Dashboard() {
       <GlassCard>
         <SectionTitle
           title="Settlement Fee Split"
-          subtitle="Every settled invoice executes an atomic onchain distribution - enforced by SynturaVault in basis points."
+          subtitle="Every settled invoice executes an atomic onchain USDT distribution - enforced by SynturaVault in basis points."
           action={
             <span className="font-mono text-xs text-slate-500">
               {supplierPct * 100} / {poolPct * 100} / {treasuryPct * 100} BPS
@@ -368,7 +394,7 @@ export default function Dashboard() {
                 <tr className="border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <th className="px-6 py-3">Invoice</th>
                   <th className="px-4 py-3">Debtor / Supplier</th>
-                  <th className="px-4 py-3">Face Value</th>
+                  <th className="px-4 py-3">Face Value · USDT</th>
                   <th className="px-4 py-3">Due Date</th>
                   <th className="px-4 py-3">AI Risk</th>
                   <th className="px-4 py-3">Discount</th>
@@ -407,7 +433,7 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-4">
                         <span className="text-sm font-semibold text-white">
-                          {formatUSD(inv.faceValueUSD)}
+                          {formatUSD(inv.faceValueUSD, { decimals: 2 })}
                         </span>
                         <p className="mt-0.5 text-xs text-slate-500">
                           {inv.termDays}d term · {inv.sector}
@@ -456,6 +482,7 @@ export default function Dashboard() {
                           invoice={inv}
                           busy={busy}
                           isSentry={isSentry}
+                          txStep={txStep}
                           onAct={handleAction}
                         />
                       </td>
