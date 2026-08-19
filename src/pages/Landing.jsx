@@ -404,12 +404,13 @@ const TRUST = [
 export default function Landing({ onLaunch }) {
   const { invoices, vault, protocolStats } = useSyntura();
 
+  // Cumulative face value put through the protocol. A monotonic activity
+  // metric, unlike the liquidity balance which falls whenever an LP exits.
+  const volumeUSD = invoices.reduce((sum, i) => sum + i.faceValueUSD, 0);
+
   const heroStats = [
     { label: "Invoices", value: String(invoices.length) },
-    {
-      label: "Liquidity",
-      value: formatUSD(vault.totalLiquidityUSD, { compact: true }),
-    },
+    { label: "Volume", value: formatUSD(volumeUSD, { compact: true }) },
     { label: "AI verdicts", value: String(protocolStats.verdicts) },
     { label: "Active users", value: String(protocolStats.participants) },
   ];
