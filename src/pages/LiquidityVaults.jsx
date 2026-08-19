@@ -45,7 +45,7 @@ const YIELD_STEPS = [
   {
     icon: Waves,
     title: "Vault streams advances",
-    body: "AI-underwritten invoices draw real-time payouts - the pool advances face value to suppliers block by block.",
+    body: "The moment an invoice clears underwriting, the pool advances most of its face value to the supplier in a single onchain payout.",
     tile: "border-violetx/30 bg-violetx/10 text-violetx-soft",
   },
   {
