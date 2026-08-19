@@ -12,9 +12,12 @@ import {
   getReadProvider,
   getContracts,
   isLiveChainConfigured,
-  usdToWei,
-  weiToUsd,
+  usdToWad,
+  wadToUsd,
+  usdToUnits,
+  unitsToUsd,
   BOTCHAIN,
+  CONTRACTS,
   DEPLOY_BLOCK,
 } from "../lib/chain.js";
 import { underwriteInvoice as runSentryModel } from "../agent/aiSentryAgent.js";
@@ -35,9 +38,17 @@ const SynturaContext = createContext(null);
  * only mints and the autonomous sentry service (service/sentry.js) submits the
  * verdict from its own key. `awaitUnderwriting` is how the UI waits for it.
  *
+ * UNITS: invoice face value on the NFT is an 18-decimal USD wad (usdToWad /
+ * wadToUsd); every USDT amount - vault views, vault events, ERC-20 balances -
+ * is 6-decimal token units (usdToUnits / unitsToUsd). The settlement amount is
+ * always read from the vault via `faceValueUnits(id)`, never derived here.
+ *
+ * Money-moving calls are ERC-20 flows: balance check -> allowance check ->
+ * exact-amount approve (never unlimited) -> act. `txStep` labels the stage.
+ *
  * Store API (stable - consumed by every page):
  *   invoices, vault, auditLog, sentries, wallet, isSentry, liveMode,
- *   configured, loading, chainError, clearChainError(),
+ *   configured, loading, chainError, txStep, clearChainError(),
  *   connect(), refresh(), tokenizeInvoice(payload, underwriting),
  *   awaitUnderwriting(id, opts), underwriteAsSentry(id),
  *   startStream(id), settleInvoice(id), depositLiquidity(amountUSD),
@@ -55,9 +66,9 @@ const EMPTY_VAULT = {
   feeSplit: { supplierPct: 90, poolPct: 7, treasuryPct: 3 },
 };
 
-const STATUS = (inv, streamedWei) => {
+const STATUS = (inv, streamedUnits) => {
   if (inv.isSettled) return "Settled";
-  if (streamedWei > 0n) return "Streaming";
+  if (streamedUnits > 0n) return "Streaming";
   if (inv.isUnderwritten) return "Underwritten";
   return "Pending";
 };
@@ -71,6 +82,13 @@ function parseMetadata(uri) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Token units -> "1,234.50" for error copy. Truncates, never flatters. */
+const fmtUSDT = (units) =>
+  unitsToUsd(units).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 /**
  * Rebuilds the exact model payload for an invoice from chain state + its
@@ -106,7 +124,7 @@ async function buildModelPayload(invoiceNFT, provider, id) {
     debtorName: inv.debtorName,
     supplierName: meta.supplierName,
     sector: meta.sector,
-    faceValueUSD: weiToUsd(inv.faceValueUSD),
+    faceValueUSD: wadToUsd(inv.faceValueUSD),
     termDays,
     dueDate: new Date(dueMs).toISOString().slice(0, 10),
     asOf: new Date(anchorMs).toISOString().slice(0, 10),
@@ -143,10 +161,14 @@ export function SynturaProvider({ children }) {
     address: null,
     connecting: false,
     balanceBOT: null,
+    balanceUSDT: null,
   });
   const [isSentry, setIsSentry] = useState(false);
   const [loading, setLoading] = useState(liveMode);
   const [chainError, setChainError] = useState(null);
+  // Stage of the in-flight money transaction, so the UI can name each step:
+  // "checking" | "approving" | "depositing" | "settling" | "confirming" | null.
+  const [txStep, setTxStep] = useState(null);
 
   const signerRef = useRef(null);
   const readProviderRef = useRef(null);
@@ -154,21 +176,35 @@ export function SynturaProvider({ children }) {
     readProviderRef.current = getReadProvider();
   }
 
-  const clearChainError = useCallback(() => setChainError(null), []);
-
   // True while the current chainError came from a failed RPC read (vs a
   // wallet/network warning), so refresh success only clears its own errors.
   const readErrorRef = useRef(false);
+
+  // True while the visible chainError is an "insufficient USDT" abort raised by
+  // prepareUSDTSpend. Tracked separately so the next spend attempt can clear its
+  // own stale message without wiping a wallet or wrong-network warning.
+  const spendErrorRef = useRef(false);
+
+  const clearChainError = useCallback(() => {
+    spendErrorRef.current = false;
+    setChainError(null);
+  }, []);
 
   /** Full chain re-read: invoices, vault accounting, events, sentries. */
   const refresh = useCallback(
     async (addressOverride) => {
       if (!liveMode) return;
       const provider = readProviderRef.current;
-      const { invoiceNFT, vault: vaultC, sentryRegistry } = getContracts(provider);
+      const {
+        invoiceNFT,
+        vault: vaultC,
+        sentryRegistry,
+        usdt,
+      } = getContracts(provider);
       const address = addressOverride ?? wallet.address;
       try {
-        const [totalRaw, totalDepWei, outstandingWei, feesWei, provCount] =
+        // Vault amounts are 6-decimal USDT units end to end.
+        const [totalRaw, totalDepUnits, outstandingUnits, feesUnits, provCount] =
           await Promise.all([
             invoiceNFT.totalInvoices(),
             vaultC.totalLiquidity(),
@@ -223,7 +259,7 @@ export function SynturaProvider({ children }) {
         const ids = Array.from({ length: total }, (_, i) => i + 1);
         const book = await Promise.all(
           ids.map(async (id) => {
-            const [inv, streamedWei, uri] = await Promise.all([
+            const [inv, streamedUnits, uri] = await Promise.all([
               invoiceNFT.getInvoice(id),
               vaultC.streamedOf(id),
               invoiceNFT.tokenURI(id).catch(() => ""),
@@ -237,7 +273,7 @@ export function SynturaProvider({ children }) {
               supplier: inv.supplier,
               supplierName: meta.supplierName || "Onchain supplier",
               debtorName: inv.debtorName,
-              faceValueUSD: weiToUsd(inv.faceValueUSD),
+              faceValueUSD: wadToUsd(inv.faceValueUSD),
               dueDate: new Date(dueMs).toISOString().slice(0, 10),
               termDays:
                 meta.termDays ??
@@ -248,8 +284,8 @@ export function SynturaProvider({ children }) {
               docHash: meta.docHash || null,
               docName: meta.docName || null,
               discountRateBps: Number(inv.discountRateBps),
-              status: STATUS(inv, streamedWei),
-              streamedPct: streamedWei > 0n || inv.isSettled ? 100 : 0,
+              status: STATUS(inv, streamedUnits),
+              streamedPct: streamedUnits > 0n || inv.isSettled ? 100 : 0,
               txHash: mintEvt?.transactionHash || "",
               mintedAt: new Date(mintTs).toISOString().slice(0, 10),
             };
@@ -268,11 +304,13 @@ export function SynturaProvider({ children }) {
             txHash: e.transactionHash,
             blockNumber: e.blockNumber,
           });
+        // InvoiceMinted carries the NFT's 18-decimal wad; every vault event
+        // below carries 6-decimal USDT units. Do not swap the converters.
         for (const e of minted)
           push(
             e, "MINT",
             `Invoice #${e.args.invoiceId} tokenized as RWA NFT on BOTChain`,
-            `Face value $${weiToUsd(e.args.faceValueUSD).toLocaleString()} · supplier ${e.args.supplier.slice(0, 6)}…${e.args.supplier.slice(-4)}`
+            `Face value $${wadToUsd(e.args.faceValueUSD).toLocaleString()} · supplier ${e.args.supplier.slice(0, 6)}…${e.args.supplier.slice(-4)}`
           );
         for (const e of underwritten)
           push(
@@ -284,30 +322,30 @@ export function SynturaProvider({ children }) {
           push(
             e, "STREAM",
             `Advance streamed for Invoice #${e.args.invoiceId}`,
-            `$${weiToUsd(e.args.amount).toLocaleString()} paid to ${e.args.supplier.slice(0, 6)}…${e.args.supplier.slice(-4)}`
+            `$${unitsToUsd(e.args.amount).toLocaleString()} USDT paid to ${e.args.supplier.slice(0, 6)}…${e.args.supplier.slice(-4)}`
           );
         for (const e of settled)
           push(
             e, "SETTLEMENT",
             `Invoice #${e.args.invoiceId} settled - 90/7/3 fee split executed`,
-            `Supplier $${weiToUsd(e.args.supplierPayout).toLocaleString()} · Pool $${weiToUsd(e.args.poolFee).toLocaleString()} · Treasury $${weiToUsd(e.args.treasuryFee).toLocaleString()}`
+            `Supplier $${unitsToUsd(e.args.supplierPayout).toLocaleString()} · Pool $${unitsToUsd(e.args.poolFee).toLocaleString()} · Treasury $${unitsToUsd(e.args.treasuryFee).toLocaleString()} USDT`
           );
         for (const e of deposited)
           push(
             e, "DEPOSIT",
-            `Liquidity deposit - $${weiToUsd(e.args.amount).toLocaleString()} into streaming vault`,
+            `Liquidity deposit - $${unitsToUsd(e.args.amount).toLocaleString()} USDT into streaming vault`,
             `Provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         for (const e of withdrawn)
           push(
             e, "WITHDRAW",
-            `Principal withdrawn - $${weiToUsd(e.args.amount).toLocaleString()} returned`,
+            `Principal withdrawn - $${unitsToUsd(e.args.amount).toLocaleString()} USDT returned`,
             `Provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         for (const e of yieldPulled)
           push(
             e, "WITHDRAW",
-            `Yield withdrawn - $${weiToUsd(e.args.amount).toLocaleString()} paid out`,
+            `Yield withdrawn - $${unitsToUsd(e.args.amount).toLocaleString()} USDT paid out`,
             `Pro-rata settlement fees · provider ${e.args.provider.slice(0, 6)}…${e.args.provider.slice(-4)}`
           );
         entries.sort((a, b) => b.blockNumber - a.blockNumber || (a.ts < b.ts ? 1 : -1));
@@ -326,42 +364,49 @@ export function SynturaProvider({ children }) {
         }));
 
         // ── Vault stats (+ per-wallet position) ──
-        let yourDepositWei = 0n;
-        let yourYieldWei = 0n;
+        let yourDepositUnits = 0n;
+        let yourYieldUnits = 0n;
         if (address) {
           let balanceWei = 0n;
+          let usdtUnits = 0n;
           let verifiedSentry = false;
-          [yourDepositWei, yourYieldWei, balanceWei, verifiedSentry] =
+          [yourDepositUnits, yourYieldUnits, balanceWei, usdtUnits, verifiedSentry] =
             await Promise.all([
               vaultC.depositOf(address),
               vaultC.yieldOf(address),
               provider.getBalance(address),
+              usdt ? usdt.balanceOf(address).catch(() => 0n) : 0n,
               sentryRegistry
                 ? sentryRegistry.isVerifiedSentry(address).catch(() => false)
                 : false,
             ]);
           setWallet((w) =>
             w.address === address
-              ? { ...w, balanceBOT: Number(balanceWei) / 1e18 }
+              ? {
+                  ...w,
+                  balanceBOT: Number(balanceWei) / 1e18,
+                  balanceUSDT: unitsToUsd(usdtUnits),
+                }
               : w
           );
           setIsSentry(Boolean(verifiedSentry));
         } else {
           setIsSentry(false);
         }
-        const totalDepUSD = weiToUsd(totalDepWei);
+        const totalDepUSD = unitsToUsd(totalDepUnits);
         setVault({
           totalLiquidityUSD: totalDepUSD,
-          activeStreamsUSD: weiToUsd(outstandingWei),
+          activeStreamsUSD: unitsToUsd(outstandingUnits),
+          // Guard on the rounded USD figure: a sub-cent pool rounds to 0.
           averageYieldAPY:
-            totalDepWei > 0n ? (weiToUsd(feesWei) / totalDepUSD) * 100 : 0,
+            totalDepUSD > 0 ? (unitsToUsd(feesUnits) / totalDepUSD) * 100 : 0,
           poolUtilizationPct:
-            totalDepWei > 0n
-              ? Number((outstandingWei * 10_000n) / totalDepWei) / 100
+            totalDepUnits > 0n
+              ? Number((outstandingUnits * 10_000n) / totalDepUnits) / 100
               : 0,
           providers: Number(provCount),
-          yourDepositUSD: weiToUsd(yourDepositWei),
-          yourYieldUSD: weiToUsd(yourYieldWei),
+          yourDepositUSD: unitsToUsd(yourDepositUnits),
+          yourYieldUSD: unitsToUsd(yourYieldUnits),
           feeSplit: { supplierPct: 90, poolPct: 7, treasuryPct: 3 },
         });
         setInvoices(book.reverse());
@@ -396,7 +441,12 @@ export function SynturaProvider({ children }) {
     try {
       const res = await connectWallet();
       if (!res) {
-        setWallet({ address: null, connecting: false, balanceBOT: null });
+        setWallet({
+          address: null,
+          connecting: false,
+          balanceBOT: null,
+          balanceUSDT: null,
+        });
         setIsSentry(false);
         setChainError("No wallet detected - install MetaMask (or any injected wallet) to transact.");
         return null;
@@ -409,18 +459,27 @@ export function SynturaProvider({ children }) {
         );
       }
       signerRef.current = res.signer;
-      const balanceWei = await readProviderRef.current
-        .getBalance(res.address)
-        .catch(() => 0n);
+      const { usdt } = getContracts(readProviderRef.current);
+      // BOT pays gas; USDT is the money. Both are read on every connect.
+      const [balanceWei, usdtUnits] = await Promise.all([
+        readProviderRef.current.getBalance(res.address).catch(() => 0n),
+        usdt ? usdt.balanceOf(res.address).catch(() => 0n) : Promise.resolve(0n),
+      ]);
       setWallet({
         address: res.address,
         connecting: false,
         balanceBOT: Number(balanceWei) / 1e18,
+        balanceUSDT: unitsToUsd(usdtUnits),
       });
       if (liveMode) refresh(res.address);
       return res.address;
     } catch (err) {
-      setWallet({ address: null, connecting: false, balanceBOT: null });
+      setWallet({
+        address: null,
+        connecting: false,
+        balanceBOT: null,
+        balanceUSDT: null,
+      });
       setIsSentry(false);
       setChainError(friendlyChainError(err, "Wallet connection failed."));
       return null;
@@ -430,7 +489,12 @@ export function SynturaProvider({ children }) {
   /** Clears the local session - injected wallets have no true "disconnect". */
   const disconnect = useCallback(() => {
     signerRef.current = null;
-    setWallet({ address: null, connecting: false, balanceBOT: null });
+    setWallet({
+      address: null,
+      connecting: false,
+      balanceBOT: null,
+      balanceUSDT: null,
+    });
     setIsSentry(false);
   }, []);
 
@@ -471,7 +535,7 @@ export function SynturaProvider({ children }) {
   const requireSigner = useCallback(async () => {
     if (!liveMode) {
       throw new Error(
-        "Contracts are not deployed yet - run `npm run deploy:botchain` and set the VITE_*_ADDRESS values in .env."
+        "Contracts are not deployed yet - run `npm run deploy:botchain` and set the VITE_*_ADDRESS values (including VITE_USDT_ADDRESS) in .env."
       );
     }
     if (!signerRef.current) {
@@ -490,7 +554,8 @@ export function SynturaProvider({ children }) {
   const tokenizeInvoice = useCallback(
     async (payload, underwriting) => {
       const { invoiceNFT } = await requireSigner();
-      const faceWei = usdToWei(payload.faceValueUSD);
+      // Face value on the NFT is an 18-decimal USD wad, NOT token units.
+      const faceWad = usdToWad(payload.faceValueUSD);
       const dueUnix = Math.floor(new Date(payload.dueDate).getTime() / 1000);
       const metadataURI = JSON.stringify({
         supplierName: payload.supplierName,
@@ -507,7 +572,7 @@ export function SynturaProvider({ children }) {
 
       const mintTx = await invoiceNFT.mintInvoice(
         payload.debtorName,
-        faceWei,
+        faceWad,
         dueUnix,
         metadataURI
       );
@@ -640,6 +705,46 @@ export function SynturaProvider({ children }) {
     [requireSigner, refresh]
   );
 
+  /**
+   * Prepares an ERC-20 spend of `units` (6-decimal USDT) by `spender`:
+   * balance check first so an underfunded wallet is told the shortfall WITHOUT
+   * being asked to sign anything, then an approval for the EXACT amount when
+   * the standing allowance is short - never an unlimited approval.
+   * Returns true when the vault is cleared to pull the funds.
+   */
+  const prepareUSDTSpend = useCallback(
+    async (usdt, spender, units, purpose) => {
+      if (!usdt) {
+        throw new Error(
+          "USDT address is not configured - set VITE_USDT_ADDRESS in .env."
+        );
+      }
+      setTxStep("checking");
+      // A fresh balance check supersedes the last shortfall message.
+      if (spendErrorRef.current) {
+        spendErrorRef.current = false;
+        setChainError(null);
+      }
+      const owner = await signerRef.current.getAddress();
+      const balance = await usdt.balanceOf(owner);
+      if (balance < units) {
+        spendErrorRef.current = true;
+        setChainError(
+          `Not enough USDT to ${purpose}: need ${fmtUSDT(units)} USDT, wallet holds ${fmtUSDT(balance)} USDT (short ${fmtUSDT(units - balance)} USDT).`
+        );
+        return false;
+      }
+      const allowance = await usdt.allowance(owner, spender);
+      if (allowance < units) {
+        setTxStep("approving");
+        const approveTx = await usdt.approve(spender, units);
+        await approveTx.wait();
+      }
+      return true;
+    },
+    []
+  );
+
   /** Streams the pool advance to the supplier. Returns tx hash or null. */
   const startStream = useCallback(
     async (id) => {
@@ -657,41 +762,70 @@ export function SynturaProvider({ children }) {
     [requireSigner, refresh]
   );
 
-  /** Settles an invoice - the caller pays face value as the debtor. */
+  /**
+   * Settles an invoice - the caller pays face value in USDT as the debtor.
+   * The amount comes from the vault's `faceValueUnits(id)`, which is the
+   * authoritative wad -> token-unit conversion; recomputing it here would risk
+   * approving a different number than the vault pulls.
+   */
   const settleInvoice = useCallback(
     async (id) => {
       try {
-        const { vault: vaultC, invoiceNFT } = await requireSigner();
-        const inv = await invoiceNFT.getInvoice(id);
-        const tx = await vaultC.settleInvoice(id, { value: inv.faceValueUSD });
+        const { vault: vaultC, usdt } = await requireSigner();
+        setTxStep("checking");
+        const units = await vaultC.faceValueUnits(id);
+        const cleared = await prepareUSDTSpend(
+          usdt,
+          CONTRACTS.vault,
+          units,
+          `settle Invoice #${id}`
+        );
+        if (!cleared) return null;
+        setTxStep("settling");
+        const tx = await vaultC.settleInvoice(id);
+        setTxStep("confirming");
         const receipt = await tx.wait();
         await refresh();
         return receipt.hash;
       } catch (err) {
         setChainError(friendlyChainError(err, "Settlement transaction failed."));
         return null;
+      } finally {
+        setTxStep(null);
       }
     },
-    [requireSigner, refresh]
+    [requireSigner, refresh, prepareUSDTSpend]
   );
 
-  /** Deposits native liquidity (USD-denominated input). */
+  /** Deposits USDT liquidity (dollar-denominated input). */
   const depositLiquidity = useCallback(
     async (amountUSD) => {
       const amount = Number(amountUSD);
       if (!amount || amount <= 0) return null;
       try {
-        const { vault: vaultC } = await requireSigner();
-        const tx = await vaultC.depositLiquidity({ value: usdToWei(amount) });
+        const { vault: vaultC, usdt } = await requireSigner();
+        const units = usdToUnits(amount);
+        const cleared = await prepareUSDTSpend(
+          usdt,
+          CONTRACTS.vault,
+          units,
+          "deposit"
+        );
+        if (!cleared) return null;
+        setTxStep("depositing");
+        const tx = await vaultC.depositLiquidity(units);
+        setTxStep("confirming");
         const receipt = await tx.wait();
         await refresh();
         return receipt.hash;
       } catch (err) {
         setChainError(friendlyChainError(err, "Deposit transaction failed."));
         return null;
+      } finally {
+        setTxStep(null);
       }
     },
-    [requireSigner, refresh]
+    [requireSigner, refresh, prepareUSDTSpend]
   );
 
   /** Pulls accrued pool-fee yield. */
@@ -720,6 +854,7 @@ export function SynturaProvider({ children }) {
       configured: liveMode,
       loading,
       chainError,
+      txStep,
       clearChainError,
       connect,
       disconnect,
@@ -742,6 +877,7 @@ export function SynturaProvider({ children }) {
       liveMode,
       loading,
       chainError,
+      txStep,
       clearChainError,
       connect,
       disconnect,

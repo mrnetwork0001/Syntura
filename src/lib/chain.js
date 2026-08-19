@@ -18,6 +18,10 @@ export const CONTRACTS = {
   invoiceNFT: import.meta.env.VITE_INVOICE_NFT_ADDRESS || "",
   vault: import.meta.env.VITE_VAULT_ADDRESS || "",
   sentryRegistry: import.meta.env.VITE_SENTRY_REGISTRY_ADDRESS || "",
+  // Bridged USDT on BOTChain - the vault's settlement token (6 decimals).
+  usdt:
+    import.meta.env.VITE_USDT_ADDRESS ||
+    "0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c",
 };
 
 /** Human-readable ABIs (ethers v6) mirroring contracts/. */
@@ -33,11 +37,15 @@ export const INVOICE_NFT_ABI = [
   "event InvoiceSettled(uint256 indexed invoiceId, uint256 supplierPayout, uint256 poolFee, uint256 treasuryFee)",
 ];
 
+/**
+ * Vault ABI. Every uint256 amount here is 6-decimal USDT base units - the only
+ * 18-decimal wad in the protocol is the NFT's faceValueUSD.
+ */
 export const VAULT_ABI = [
-  "function depositLiquidity() payable",
+  "function depositLiquidity(uint256 amount)",
   "function withdrawLiquidity(uint256 amount)",
   "function streamPayout(uint256 invoiceId)",
-  "function settleInvoice(uint256 invoiceId) payable",
+  "function settleInvoice(uint256 invoiceId)",
   "function withdrawYield()",
   "function totalLiquidity() view returns (uint256)",
   "function availableLiquidity() view returns (uint256)",
@@ -47,11 +55,22 @@ export const VAULT_ABI = [
   "function totalOutstandingAdvances() view returns (uint256)",
   "function totalPoolFeesAccrued() view returns (uint256)",
   "function yieldOf(address provider) view returns (uint256)",
+  "function faceValueUnits(uint256 invoiceId) view returns (uint256)",
+  "function token() view returns (address)",
   "event LiquidityDeposited(address indexed provider, uint256 amount)",
   "event LiquidityWithdrawn(address indexed provider, uint256 amount)",
   "event PayoutStreamed(uint256 indexed invoiceId, address indexed supplier, uint256 amount)",
   "event YieldWithdrawn(address indexed provider, uint256 amount)",
   "event SettlementExecuted(uint256 indexed invoiceId, uint256 supplierPayout, uint256 poolFee, uint256 treasuryFee)",
+];
+
+/** Minimal ERC-20 surface for the settlement token (balances are token units). */
+export const ERC20_ABI = [
+  "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
 ];
 
 export const SENTRY_REGISTRY_ABI = [
@@ -161,6 +180,9 @@ export function getContracts(signerOrProvider) {
     sentryRegistry: CONTRACTS.sentryRegistry
       ? new Contract(CONTRACTS.sentryRegistry, SENTRY_REGISTRY_ABI, signerOrProvider)
       : null,
+    usdt: CONTRACTS.usdt
+      ? new Contract(CONTRACTS.usdt, ERC20_ABI, signerOrProvider)
+      : null,
   };
 }
 
@@ -174,26 +196,44 @@ export function explorerAddressUrl(addr) {
 
 /** True when contract addresses are configured (live mode). */
 export function isLiveChainConfigured() {
-  return Boolean(CONTRACTS.invoiceNFT && CONTRACTS.vault);
+  return Boolean(CONTRACTS.invoiceNFT && CONTRACTS.vault && CONTRACTS.usdt);
 }
 
 /**
- * Onchain value scale: invoices are denominated in USD, settlement legs move
- * native BOT at 1 USD = 1e12 wei (documented protocol constant). A $125,000
- * invoice therefore settles with 0.125 BOT of real value - every flow is a
- * genuine mainnet transaction without requiring six-figure balances.
+ * TWO SCALES, never interchangeable:
+ *
+ *  - Invoice face value on the NFT is an 18-decimal USD wad ($1 = 1e18):
+ *    mintInvoice(faceValueUSD), Invoice.faceValueUSD, and the NFT's
+ *    InvoiceMinted / InvoiceUnderwritten / InvoiceSettled amounts.
+ *  - Every USDT amount is 6-decimal token base units ($1 = 1e6): all vault
+ *    views and events, faceValueUnits(id), and ERC-20 balances/allowances.
+ *
+ * The vault converts wad -> units internally (USD_WAD_PER_TOKEN_UNIT = 1e12);
+ * the frontend must never do that division - read faceValueUnits(id) instead.
  */
-export const WEI_PER_USD = 10n ** 12n;
+export const USDT_DECIMALS = 6;
+export const USD_WAD_DECIMALS = 18;
 
-/** USD number -> bigint wei at the protocol scale. */
-export function usdToWei(usd) {
+/** USD number -> 18-decimal USD wad (bigint) for the invoice NFT. */
+export function usdToWad(usd) {
   // Round to cents first so float noise can't corrupt the bigint conversion.
-  return (BigInt(Math.round(Number(usd) * 100)) * WEI_PER_USD) / 100n;
+  return BigInt(Math.round(Number(usd) * 100)) * 10n ** 16n;
 }
 
-/** bigint wei -> USD number at the protocol scale. */
-export function weiToUsd(wei) {
-  return Number((wei * 100n) / WEI_PER_USD) / 100;
+/** 18-decimal USD wad (bigint) -> USD number, truncated to cents. */
+export function wadToUsd(wad) {
+  return Number((BigInt(wad) * 100n) / 10n ** 18n) / 100;
+}
+
+/** USD number -> 6-decimal USDT base units (bigint). */
+export function usdToUnits(usd) {
+  // Same cents rounding as usdToWad, so the two scales agree to the cent.
+  return BigInt(Math.round(Number(usd) * 100)) * 10n ** 4n;
+}
+
+/** 6-decimal USDT base units (bigint) -> USD number, truncated to cents. */
+export function unitsToUsd(units) {
+  return Number((BigInt(units) * 100n) / 10n ** 6n) / 100;
 }
 
 /** First block to scan for protocol events (set after deployment to speed reads). */
