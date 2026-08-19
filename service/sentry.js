@@ -53,10 +53,12 @@ const GAS_FLOOR_WEI = parseEther("0.01");
 const ZERO_HASH = `0x${"00".repeat(32)}`;
 const MAX_DISCOUNT_BPS = 5000; // SynturaInvoiceNFT.MAX_DISCOUNT_BPS
 
-/** Onchain USD scale: 1 USD = 1e12 wei (mirrors WEI_PER_USD in src/lib/chain.js,
- *  reimplemented here because that module is browser-only). */
-const WEI_PER_USD = 10n ** 12n;
-const weiToUsd = (wei) => Number((BigInt(wei) * 100n) / WEI_PER_USD) / 100;
+/** Invoice face value onchain is an 18-decimal USD wad: 1 USD = 1e18. Mirrors
+ *  wadToUsd in src/lib/chain.js, reimplemented here because that module is
+ *  browser-only. Truncates to whole cents; never touches USDT token units
+ *  (6 decimals), which this service does not read. */
+const USD_WAD_PER_USD = 10n ** 18n;
+const wadToUsd = (wad) => Number((BigInt(wad) * 100n) / USD_WAD_PER_USD) / 100;
 
 function envInt(name, fallback, min) {
   const raw = Number(process.env[name]);
@@ -538,7 +540,7 @@ function optionalString(value) {
  * through to identical model defaults and produce identical audit hashes.
  */
 function buildPayload(invoice, metadata, mintContext) {
-  const faceValueUSD = weiToUsd(invoice.faceValueUSD);
+  const faceValueUSD = wadToUsd(invoice.faceValueUSD);
   const dueMs = Number(invoice.dueDate) * 1000;
   const dueValid = Number.isFinite(dueMs) && dueMs > 0 && dueMs < 8.64e15;
   const anchorMs = mintContext.timestampMs ?? Date.now();
