@@ -156,7 +156,8 @@ function DepositSteps({ txStep, approvalSeen }) {
 }
 
 export default function LiquidityVaults() {
-  const { vault, wallet, txStep, depositLiquidity, withdrawYield } = useSyntura();
+  const { vault, wallet, txStep, depositLiquidity, withdrawLiquidity, withdrawYield } =
+    useSyntura();
 
   const [amountInput, setAmountInput] = useState("");
   const [depositing, setDepositing] = useState(false);
@@ -165,6 +166,8 @@ export default function LiquidityVaults() {
   const [approvalSeen, setApprovalSeen] = useState(false);
   const [depositTx, setDepositTx] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawingPrincipal, setWithdrawingPrincipal] = useState(false);
+  const [principalTx, setPrincipalTx] = useState(null);
   const [withdrawTx, setWithdrawTx] = useState(null);
   const [lastWithdrawnUSD, setLastWithdrawnUSD] = useState(0);
 
@@ -212,6 +215,24 @@ export default function LiquidityVaults() {
       }
     } finally {
       setDepositing(false);
+    }
+  };
+
+  // Principal is capped by what the pool is not currently lending out.
+  const withdrawablePrincipal = Math.min(
+    vault.yourDepositUSD,
+    vault.availableLiquidityUSD
+  );
+
+  const handleWithdrawPrincipal = async () => {
+    if (withdrawablePrincipal <= 0 || withdrawingPrincipal) return;
+    setWithdrawingPrincipal(true);
+    setPrincipalTx(null);
+    try {
+      const tx = await withdrawLiquidity(withdrawablePrincipal);
+      if (tx) setPrincipalTx(tx);
+    } finally {
+      setWithdrawingPrincipal(false);
     }
   };
 
@@ -522,7 +543,48 @@ export default function LiquidityVaults() {
               </div>
             </div>
 
-            <div className="mt-auto pt-5">
+            <div className="mt-auto space-y-2.5 pt-5">
+              <button
+                type="button"
+                onClick={handleWithdrawPrincipal}
+                disabled={withdrawablePrincipal <= 0 || withdrawingPrincipal}
+                title={
+                  vault.yourDepositUSD > 0 && withdrawablePrincipal < vault.yourDepositUSD
+                    ? "Part of your principal is financing an outstanding advance and unlocks when that invoice settles"
+                    : undefined
+                }
+                className={cn(
+                  "btn-primary w-full",
+                  (withdrawablePrincipal <= 0 || withdrawingPrincipal) &&
+                    "cursor-not-allowed opacity-50"
+                )}
+              >
+                {withdrawingPrincipal ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    Withdrawing principal…
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <ArrowDownToLine size={16} />
+                    Withdraw {formatUSD(withdrawablePrincipal, { decimals: 2 })} principal
+                  </span>
+                )}
+              </button>
+              {vault.yourDepositUSD > 0 &&
+                withdrawablePrincipal < vault.yourDepositUSD && (
+                  <p className="text-center text-[11px] text-slate-500">
+                    {formatUSD(vault.yourDepositUSD - withdrawablePrincipal, {
+                      decimals: 2,
+                    })}{" "}
+                    is financing an outstanding advance and unlocks on settlement.
+                  </p>
+                )}
+              {principalTx && (
+                <p className="text-center text-[11px] text-emeraldx-soft">
+                  Principal returned · <TxLink hash={principalTx} />
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleWithdraw}

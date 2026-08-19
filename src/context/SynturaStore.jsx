@@ -58,6 +58,7 @@ const SynturaContext = createContext(null);
 const EMPTY_VAULT = {
   totalLiquidityUSD: 0,
   activeStreamsUSD: 0,
+  availableLiquidityUSD: 0,
   averageYieldAPY: 0, // lifetime pool return % (fees / deposits)
   poolUtilizationPct: 0,
   providers: 0,
@@ -416,6 +417,7 @@ export function SynturaProvider({ children }) {
         setVault({
           totalLiquidityUSD: totalDepUSD,
           activeStreamsUSD: unitsToUsd(outstandingUnits),
+          availableLiquidityUSD: unitsToUsd(totalDepUnits - outstandingUnits),
           // Guard on the rounded USD figure: a sub-cent pool rounds to 0.
           averageYieldAPY:
             totalDepUSD > 0 ? (unitsToUsd(feesUnits) / totalDepUSD) * 100 : 0,
@@ -901,6 +903,32 @@ export function SynturaProvider({ children }) {
     [requireSigner, refresh, prepareUSDTSpend]
   );
 
+  /**
+   * Returns deposited principal. No approval needed - the vault is sending,
+   * not pulling. Capped by availableLiquidity: principal currently financing
+   * an outstanding advance cannot leave until that invoice settles.
+   */
+  const withdrawLiquidity = useCallback(
+    async (amountUSD) => {
+      const amount = Number(amountUSD);
+      if (!amount || amount <= 0) return null;
+      try {
+        const { vault: vaultC } = await requireSigner();
+        setTxStep("confirming");
+        const tx = await vaultC.withdrawLiquidity(usdToUnits(amount));
+        const receipt = await tx.wait();
+        await refresh();
+        return receipt.hash;
+      } catch (err) {
+        setChainError(friendlyChainError(err, "Principal withdrawal failed."));
+        return null;
+      } finally {
+        setTxStep(null);
+      }
+    },
+    [requireSigner, refresh]
+  );
+
   /** Pulls accrued pool-fee yield. */
   const withdrawYield = useCallback(async () => {
     try {
@@ -939,6 +967,7 @@ export function SynturaProvider({ children }) {
       startStream,
       settleInvoice,
       depositLiquidity,
+      withdrawLiquidity,
       withdrawYield,
     }),
     [
@@ -963,6 +992,7 @@ export function SynturaProvider({ children }) {
       startStream,
       settleInvoice,
       depositLiquidity,
+      withdrawLiquidity,
       withdrawYield,
     ]
   );
