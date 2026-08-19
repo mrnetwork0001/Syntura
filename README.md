@@ -330,7 +330,21 @@ Nothing about the service is privileged: it is plain ESM against two public cont
 
 ## Frontend Feature Tour
 
-Premium dark-glassmorphism dApp — React 18, Vite 5, Tailwind, framer-motion, lucide icons. Fully responsive, animated page transitions, every transaction deep-linked to the BOTChain explorer.
+Dark terminal-style dApp - React 18, Vite 5, Tailwind, framer-motion, lucide icons. Fully responsive, animated page transitions, every transaction deep-linked to the BOTChain explorer. Screenshots below are the live app at [syntura.xyz](https://syntura.xyz) reading BOT Chain Mainnet - the figures are real settled invoices, not mockups.
+
+<img src="docs/screenshots/landing.png" alt="Syntura landing page with the live repricing ticker" width="100%">
+
+**Dashboard** - live protocol stats, the 90/7/3 settlement split, and the invoice book with per-row lifecycle actions.
+
+<img src="docs/screenshots/dashboard.png" alt="Syntura dashboard showing the RWA invoice book and settlement split" width="100%">
+
+**AI Risk Underwriter** - an interactive sandbox where every input re-prices the invoice instantly, with the full factor breakdown and the deterministic audit commitment.
+
+<img src="docs/screenshots/underwriter.png" alt="AI Risk Underwriter sandbox with live factor breakdown" width="100%">
+
+**Onchain Audit Log** - every mint, underwrite, stream, deposit and settlement as an explorer-linked timeline built from contract events.
+
+<img src="docs/screenshots/audit-log.png" alt="Onchain audit log timeline" width="100%">
 
 | # | Screen | What it shows |
 |---|--------|---------------|
