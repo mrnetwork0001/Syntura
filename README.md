@@ -432,11 +432,24 @@ All three contracts are **source-verified on the explorer** - each address below
 | Contract | Address |
 |----------|---------|
 | `SynturaInvoiceNFT` (SYNV) | [`0xD8816ecf2D243f4B5328502ACAB83a9dF043A40a`](https://scan.botchain.ai/address/0xD8816ecf2D243f4B5328502ACAB83a9dF043A40a) |
-| `SynturaVault` | [`0x7199D8db46142B784ab4De225EADf91f4F10ca14`](https://scan.botchain.ai/address/0x7199D8db46142B784ab4De225EADf91f4F10ca14) |
+| `SynturaVault` (USDT-settled) | [`0x5eD988A1367495aB895714F062A66E509e5E0D3d`](https://scan.botchain.ai/address/0x5eD988A1367495aB895714F062A66E509e5E0D3d) |
 | `SynturaSentryRegistry` | [`0x19B0c0BB8A654b950739B84776A5951BA4ABf676`](https://scan.botchain.ai/address/0x19B0c0BB8A654b950739B84776A5951BA4ABf676) |
-| Registered AI sentry (`syntura-sentry-v1`) | [`0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635`](https://scan.botchain.ai/address/0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635) |
+| Autonomous AI sentry (`syntura-sentry-v1`) | [`0x51d6E0829111b477E237528f7f90740055fDfF8e`](https://scan.botchain.ai/address/0x51d6E0829111b477E237528f7f90740055fDfF8e) |
+| Settlement token (bridged USDT, 6 dp) | [`0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C`](https://scan.botchain.ai/address/0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C) |
+| Owner / treasury | [`0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635`](https://scan.botchain.ai/address/0x6d8C0D2dBAa4c55e264Ccb7AcdCf9f727B9a0635) |
 
-The vault is wired into the NFT (`setVault`), and the sentry above is registry-verified - `underwriteInvoice` is gated through `isVerifiedSentry`. The [autonomous sentry service](#autonomous-ai-sentry-service) runs under its own dedicated key, registered the same way with `registerSentry(<service address>, "syntura-sentry-v1")`, so the deployer key never has to be online to underwrite.
+The vault is wired into the NFT (`setVault`) and the sentry is registry-verified, so `underwriteInvoice` is gated through `isVerifiedSentry`. The [autonomous sentry service](#autonomous-ai-sentry-service) holds that dedicated key on its own server - the deployer key is never online to underwrite, and the browser never holds a sentry key at all.
+
+> An earlier vault at `0x7199D8db46142B784ab4De225EADf91f4F10ca14` settled in native BOT. It was replaced by the USDT vault above and is no longer wired to the NFT; it is listed only so the migration is traceable.
+
+### Proven onchain
+
+The full lifecycle has executed on mainnet, not just in tests:
+
+| | |
+|---|---|
+| `#SYNV-001` | Minted, underwritten by the autonomous sentry, advance streamed, then **settled** - the 90/7/3 split paid $0.0535 supplier residual, $0.07 pool, $0.03 treasury |
+| `#SYNV-002` | Minted by an **external wallet** (`0x9E05d95c...79ed`), underwritten by the sentry **7 seconds later** with no human involvement |
 
 All chain parameters are **environment-driven**, with the verified BOT Chain Mainnet values as fallback defaults:
 
