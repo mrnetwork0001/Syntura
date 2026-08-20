@@ -176,10 +176,13 @@ function SentryTerminal({ onLaunch }) {
       onMouseLeave={() => setPaused(false)}
     >
       <div className="flex items-center justify-between">
-        <Eyebrow>Invoice ingested</Eyebrow>
-        <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emeraldx-soft">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emeraldx" />
-          Live
+        <Eyebrow>Sample invoice</Eyebrow>
+        <span
+          title="Sample payloads priced in your browser by the real model - not onchain invoices"
+          className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+          Model preview
         </span>
       </div>
 
@@ -196,7 +199,7 @@ function SentryTerminal({ onLaunch }) {
               <span className="rounded bg-electric/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-electric">
                 SYNV
               </span>
-              <span className="font-mono text-[10px] text-slate-600">just now</span>
+              <span className="font-mono text-[10px] text-slate-600">sample</span>
             </div>
             <p className="mt-2 truncate text-sm font-semibold text-slate-200">
               {payload.debtorName} - {formatUSD(payload.faceValueUSD)} ·{" "}
@@ -402,18 +405,22 @@ const TRUST = [
 ];
 
 export default function Landing({ onLaunch }) {
-  const { invoices, vault, protocolStats } = useSyntura();
+  const { invoices, protocolStats, loading } = useSyntura();
+
+  // Before the first chain read resolves every counter is legitimately 0,
+  // which reads as a dead protocol. Show a placeholder until data lands.
+  const stat = (v) => (loading ? "-" : v);
 
   const heroStats = [
-    { label: "Invoices", value: String(invoices.length) },
+    { label: "Invoices", value: stat(String(invoices.length)) },
     {
       // Cumulative capital deposited - monotonic, so an LP exiting never makes
       // the protocol look like it shrank.
       label: "Volume",
-      value: formatUSD(protocolStats.depositedUSD, { compact: true }),
+      value: stat(formatUSD(protocolStats.depositedUSD, { compact: true })),
     },
-    { label: "AI verdicts", value: String(protocolStats.verdicts) },
-    { label: "Active users", value: String(protocolStats.participants) },
+    { label: "AI verdicts", value: stat(String(protocolStats.verdicts)) },
+    { label: "Active users", value: stat(String(protocolStats.participants)) },
   ];
 
   return (

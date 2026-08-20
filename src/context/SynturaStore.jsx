@@ -163,6 +163,8 @@ export function SynturaProvider({ children }) {
     verdicts: 0,
     settlements: 0,
     depositedUSD: 0,
+    latestCommitTx: null,
+    latestCommitAgent: null,
   });
   const [wallet, setWallet] = useState({
     address: null,
@@ -232,6 +234,7 @@ export function SynturaProvider({ children }) {
           yieldPulled,
           sentriesReg,
           commits,
+          revocations,
         ] = await Promise.all([
           invoiceNFT.queryFilter(invoiceNFT.filters.InvoiceMinted(), DEPLOY_BLOCK),
           invoiceNFT.queryFilter(invoiceNFT.filters.InvoiceUnderwritten(), DEPLOY_BLOCK),
@@ -245,6 +248,11 @@ export function SynturaProvider({ children }) {
             : [],
           sentryRegistry
             ? sentryRegistry.queryFilter(sentryRegistry.filters.RiskScoreCommitted(), DEPLOY_BLOCK)
+            : [],
+          sentryRegistry
+            ? sentryRegistry
+                .queryFilter(sentryRegistry.filters.SentryRevoked(), DEPLOY_BLOCK)
+                .catch(() => [])
             : [],
         ]);
 
@@ -363,12 +371,21 @@ export function SynturaProvider({ children }) {
           const a = e.args.agent.toLowerCase();
           commitCount[a] = (commitCount[a] || 0) + 1;
         }
-        const sentryList = sentriesReg.map((e) => ({
-          address: e.args.agent,
-          modelId: e.args.modelId,
-          commitments: commitCount[e.args.agent.toLowerCase()] || 0,
-          verified: true,
-        }));
+        // A revoked agent must not be presented as verified, and the panel has
+        // to lead with the sentry that is actually underwriting - the deployer
+        // is registered first at deploy time but never commits anything.
+        const revoked = new Set(
+          revocations.map((e) => e.args.agent.toLowerCase())
+        );
+        const sentryList = sentriesReg
+          .filter((e) => !revoked.has(e.args.agent.toLowerCase()))
+          .map((e) => ({
+            address: e.args.agent,
+            modelId: e.args.modelId,
+            commitments: commitCount[e.args.agent.toLowerCase()] || 0,
+            verified: true,
+          }))
+          .sort((a, b) => b.commitments - a.commitments);
 
         // Distinct wallets that have actually used the protocol - suppliers who
         // minted plus providers who supplied liquidity. Sentries are excluded:
@@ -384,9 +401,14 @@ export function SynturaProvider({ children }) {
         let depositedUnits = 0n;
         for (const e of deposited) depositedUnits += e.args.amount;
 
+        const lastCommit = commits[commits.length - 1];
         setProtocolStats({
           participants: participants.size,
           verdicts: underwritten.length,
+          // The most recent RiskScoreCommitted tx - the actual proof that an
+          // agent committed a verdict, not the invoice's mint transaction.
+          latestCommitTx: lastCommit?.transactionHash ?? null,
+          latestCommitAgent: lastCommit?.args?.agent ?? null,
           settlements: settled.length,
           depositedUSD: unitsToUsd(depositedUnits),
         });

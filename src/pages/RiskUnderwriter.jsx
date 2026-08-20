@@ -178,7 +178,7 @@ function SentryStatusChip({ tone, icon: Icon, children }) {
 }
 
 export default function RiskUnderwriter() {
-  const { invoices, liveMode, sentries } = useSyntura();
+  const { invoices, liveMode, sentries, protocolStats } = useSyntura();
   const [form, setForm] = useState(PRESETS[0].values);
   const [activePreset, setActivePreset] = useState(PRESETS[0].name);
 
@@ -685,7 +685,7 @@ export default function RiskUnderwriter() {
           Every underwriting emits <span className="font-mono text-slate-400">RiskScoreCommitted</span> on BOTChain -
           latest commitment:
         </p>
-        <TxLink hash={invoices.find((i) => i.riskScore > 0)?.txHash} />
+        <TxLink hash={protocolStats.latestCommitTx} />
       </div>
     </motion.div>
   );

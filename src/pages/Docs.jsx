@@ -830,9 +830,9 @@ export default function Docs() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-10 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 overflow-x-hidden px-6 py-10 lg:grid-cols-[240px_1fr] lg:overflow-x-visible">
         {/* Section nav */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           {/* Mobile: horizontal chip rail */}
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin lg:hidden">
             {SECTIONS.map((s) => (

@@ -79,6 +79,7 @@ export const SENTRY_REGISTRY_ABI = [
   "function isVerifiedSentry(address agent) view returns (bool)",
   "event SentryRegistered(address indexed agent, string modelId)",
   "event RiskScoreCommitted(uint256 indexed invoiceId, address indexed agent, uint16 riskScore, bytes32 auditHash)",
+  "event SentryRevoked(address indexed agent)",
 ];
 
 /** Read-only provider against BOTChain RPC. */
