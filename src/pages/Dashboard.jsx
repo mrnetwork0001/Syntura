@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Loader2,
   ReceiptText,
+  AlertTriangle,
 } from "lucide-react";
 import { useSyntura } from "../context/SynturaStore.jsx";
 import {
@@ -76,8 +77,24 @@ const SETTLE_STEP_LABEL = {
  * only appears for a registry-verified sentry wallet; everyone else waits for
  * the autonomous service.
  */
-function RowAction({ invoice, busy, isSentry, txStep, onAct }) {
+function RowAction({ invoice, busy, isSentry, txStep, availableUSD = 0, onAct }) {
   if (invoice.status === "Underwritten") {
+    // The vault advances face x (90% - discount); offering the button when the
+    // pool cannot cover that just hands the user a bare revert.
+    const advanceUSD =
+      (invoice.faceValueUSD * (9000 - invoice.discountRateBps)) / 10000;
+    const underfunded = availableUSD < advanceUSD;
+    if (underfunded) {
+      return (
+        <span
+          title={`Needs ${formatUSD(advanceUSD, { decimals: 2 })} of available liquidity; the pool holds ${formatUSD(availableUSD, { decimals: 2 })}`}
+          className="inline-flex min-w-[128px] cursor-help items-center justify-center gap-1.5 text-xs font-medium text-amber-300/80"
+        >
+          <AlertTriangle size={13} />
+          Awaiting liquidity
+        </span>
+      );
+    }
     return (
       <button
         onClick={() => onAct(invoice)}
@@ -482,6 +499,7 @@ export default function Dashboard() {
                           invoice={inv}
                           busy={busy}
                           isSentry={isSentry}
+                          availableUSD={vault.availableLiquidityUSD}
                           txStep={txStep}
                           onAct={handleAction}
                         />

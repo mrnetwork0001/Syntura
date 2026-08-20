@@ -342,8 +342,8 @@ export function SynturaProvider({ children }) {
         for (const e of settled)
           push(
             e, "SETTLEMENT",
-            `Invoice #${e.args.invoiceId} settled - 90/7/3 fee split executed`,
-            `Supplier $${unitsToUsd(e.args.supplierPayout).toLocaleString()} · Pool $${unitsToUsd(e.args.poolFee).toLocaleString()} · Treasury $${unitsToUsd(e.args.treasuryFee).toLocaleString()} USDT`
+            `Invoice #${e.args.invoiceId} settled - 90/7/3 split executed onchain`,
+            `Supplier residual $${unitsToUsd(e.args.supplierPayout).toLocaleString()} (90% less the advance already streamed) · Pool $${unitsToUsd(e.args.poolFee).toLocaleString()} · Treasury $${unitsToUsd(e.args.treasuryFee).toLocaleString()} USDT`
           );
         for (const e of deposited)
           push(
@@ -395,6 +395,7 @@ export function SynturaProvider({ children }) {
           ...deposited.map((e) => e.args.provider.toLowerCase()),
           ...withdrawn.map((e) => e.args.provider.toLowerCase()),
         ]);
+
         // Cumulative capital entrusted to the vault. Deposits only - counting
         // withdrawals too would let the same dollar inflate the figure by
         // cycling in and out.
@@ -449,8 +450,13 @@ export function SynturaProvider({ children }) {
           activeStreamsUSD: unitsToUsd(outstandingUnits),
           availableLiquidityUSD: unitsToUsd(totalDepUnits - outstandingUnits),
           // Guard on the rounded USD figure: a sub-cent pool rounds to 0.
+          // Lifetime return = fees ever accrued over capital ever deposited.
+          // Using current balances made this read 0.00% the moment a provider
+          // withdrew, hiding the only realised yield the protocol has produced.
           averageYieldAPY:
-            totalDepUSD > 0 ? (unitsToUsd(feesUnits) / totalDepUSD) * 100 : 0,
+            depositedUnits > 0n
+              ? (unitsToUsd(feesUnits) / unitsToUsd(depositedUnits)) * 100
+              : 0,
           poolUtilizationPct:
             totalDepUnits > 0n
               ? Number((outstandingUnits * 10_000n) / totalDepUnits) / 100
