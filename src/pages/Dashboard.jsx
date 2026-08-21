@@ -194,6 +194,7 @@ function RowAction({ invoice, busy, isSentry, txStep, availableUSD = 0, onAct })
 export default function Dashboard() {
   const {
     invoices,
+    wallet,
     vault,
     startStream,
     settleInvoice,
@@ -202,6 +203,17 @@ export default function Dashboard() {
     txStep,
   } = useSyntura();
   const [pendingIds, setPendingIds] = useState(() => new Set());
+  // The book is protocol-wide by default - liquidity providers need to see
+  // what they are funding, and streaming is permissionless. Suppliers can
+  // narrow it to their own invoices once a wallet is connected.
+  const [scope, setScope] = useState("all");
+
+  const mine = wallet.address
+    ? invoices.filter(
+        (i) => i.supplier?.toLowerCase() === wallet.address.toLowerCase()
+      )
+    : [];
+  const shownInvoices = scope === "mine" ? mine : invoices;
 
   const stats = useMemo(() => {
     const audited = invoices.filter((i) => i.riskScore > 0).length;
@@ -389,19 +401,51 @@ export default function Dashboard() {
         <div className="px-6 pt-6">
           <SectionTitle
             title="RWA Invoice Book"
-            subtitle="Every tokenized invoice, its AI underwriting verdict and live stream state."
+            subtitle={
+              scope === "mine"
+                ? "Invoices minted by the connected wallet."
+                : "Every tokenized invoice on Syntura, its AI underwriting verdict and live stream state."
+            }
             action={
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/70 bg-panel/40 px-3 py-1 text-xs font-semibold text-slate-300">
-                <ReceiptText size={13} className="text-electric-soft" />
-                {invoices.length} onchain
-              </span>
+              <div className="flex items-center gap-2">
+                {wallet.address && (
+                  <div className="inline-flex rounded-full border border-white/10 bg-white/[0.03] p-0.5">
+                    {[
+                      ["all", `All ${invoices.length}`],
+                      ["mine", `Mine ${mine.length}`],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setScope(key)}
+                        className={cn(
+                          "rounded-full px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                          scope === key
+                            ? "bg-electric/15 text-electric"
+                            : "text-slate-500 hover:text-slate-300"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/70 bg-panel/40 px-3 py-1 text-xs font-semibold text-slate-300">
+                  <ReceiptText size={13} className="text-electric-soft" />
+                  {shownInvoices.length} onchain
+                </span>
+              </div>
             }
           />
         </div>
-        {invoices.length === 0 ? (
+        {shownInvoices.length === 0 ? (
           <EmptyState
             icon={ReceiptText}
-            title="No invoices tokenized yet"
+            title={
+              scope === "mine"
+                ? "This wallet has not minted an invoice yet"
+                : "No invoices tokenized yet"
+            }
             subtitle="Mint your first RWA invoice NFT to populate the book."
           />
         ) : (
@@ -421,7 +465,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv, i) => {
+                {shownInvoices.map((inv, i) => {
                   const tier = classifyRisk(inv.riskScore);
                   const busy = pendingIds.has(inv.id);
                   return (
