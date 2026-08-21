@@ -733,6 +733,7 @@ const SECTIONS = [
         <H2>The compliance roadmap</H2>
         <KVTable
           rows={[
+            ["Confidential invoice fields", "Today the debtor name, face value and terms are stored in the clear onchain, so the invoice book is fully public - good for auditability, wrong for commercial confidentiality. The document-anchoring pattern generalises: commit a hash of the debtor identity and keep the plaintext off-chain with the sentry and counterparties, so the book still proves an invoice existed, was priced and settled, without naming who owes what."],
             ["Debtor attestation", "The debtor counter-signs the invoice hash (EIP-712), upgrading self-attested claims to two-party attested assets."],
             ["Independent sentries", "Third-party underwriting agents register with their own model IDs; disagreement between sentries becomes a priced risk signal."],
             ["Compliance module", "Allow-listed participants (KYB attestations) as an optional market tier for regulated liquidity."],
